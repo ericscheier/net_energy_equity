@@ -6,4 +6,4 @@ To reproduce the paper:
 2. Open in RStudio
 3. Ensure that the directory to which you downloaded the code is your working directory
 4. Ensure that you have all of the packages needed (listed in libraries.R)
-5. `source render.R` to reproduce the paper from scratch (if you already have done so before, data munging will not be repeated)
+5. `source("render.R")` to reproduce the paper from scratch (if you already have done so before, data munging will not be repeated)
