@@ -192,7 +192,7 @@ density_chart <- function(graph_data,
     legend_title <- gsub("_"," ",legend_title,fixed=TRUE)
     legend_title <- str_to_title(legend_title)
     # combine
-    legend_title <- paste0(paste(legend_title, sep=" ", collapse=" & "))
+    legend_title <- paste0(paste(legend_title, sep=" ", collapse=" &\n"))
   }
   print(legend_title)
   
@@ -201,6 +201,9 @@ density_chart <- function(graph_data,
   } else {
     pal_n <- 1
   }
+  
+  graph_data$group_name <- str_to_title(gsub("+"," &\n",
+                                             graph_data$group_name,fixed=TRUE))
   
   movie <- "Darjeeling1" #"GrandBudapest1"
   #pal <- wes_palette(name=movie, n=pal_n, type="continuous")
@@ -225,19 +228,22 @@ density_chart <- function(graph_data,
     ggplot(aes_string(x=metric_name, 
                       weight="group_household_weights",
                       color=if(is.null(group_columns)){group_columns}else{
+                        "group_name"
                         #interaction(!!!sym(group_columns))
-                        paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
                       },
                       fill=if(is.null(group_columns)){group_columns}else{
                         #interaction(!!!sym(group_columns))
-                        paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                        "group_name"
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
                       },
                       linetype=if(is.null(group_columns)){group_columns}else{
                         #interaction(!!!sym(group_columns))
-                        paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                        "group_name"
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
                       }
     )) + 
-    stat_ewcdf(geom='line',  alpha=1, na.rm=T, show.legend = NA) + 
+    stat_ewcdf(geom='line',  alpha=1, na.rm=T, show.legend = NA, size=0.2) + 
     stat_ewcdf(aes(ymin=..y.., ymax=1), geom='ribbon', alpha=.1, 
                na.rm=T, show.legend = NA) + 
     theme_minimal() + 
@@ -252,14 +258,11 @@ density_chart <- function(graph_data,
                        breaks=seq(from=0,to=1,by=.25), 
                        # minor_breaks=seq(from=0,to=1,by=.05),
                        name=x_label) + 
-    guides(color = guide_legend(override.aes = list(size = .01)),
-           fill = guide_legend(override.aes = list(size = .01)),
-           linetype = guide_legend(override.aes = list(size = .01))
-           ) + 
     theme(legend.justification = c(0, 1), 
           legend.position = c(0, 1), 
-          legend.title=element_text(size=7),#element_blank(),
-          legend.text=element_text(size=6),
+          legend.title=element_text(size=8),#element_blank(),
+          legend.text=element_text(size=6), 
+          legend.key.size = unit(10, "points"),
           panel.background = element_blank(),#element_rect(fill="#f1f1f1"),
           panel.grid.major = element_blank(),#element_line(color="#DCDCDC"),
           panel.grid.minor = element_blank(),#element_line(color="#DCDCDC"),
@@ -284,6 +287,12 @@ density_chart <- function(graph_data,
                                                  unit = "pt")),
           axis.ticks=element_line(color = "black"),
           axis.ticks.length = unit(-0.1, "cm")) + 
+    # guides(guide_legend(override.aes = list(size = .01))
+    guides(guide_legend(override.aes = list(size = 0.05))#,
+           # fill = guide_legend(override.aes = list(size = 0)),
+           # linetype = guide_legend(override.aes = list(size = 0)),
+           # ribbon = guide_legend(override.aes = list(size = 0))
+    ) + 
     # geom_segment(y = 0,
     #              x = as.numeric(weighted_medians[weighted_medians$group=="All",c("median_eroi")]),
     #              yend = 0.5,
@@ -303,19 +312,19 @@ density_chart <- function(graph_data,
   geom_vline(xintercept = metric_cutoff_level,
              linetype="dotted",
              color = "red",
-             size=1.0,
+             size=0.2,
              alpha=0.75) +
     annotate("text",
-             y = 1,
-             x = metric_cutoff_level,
+             y = 0.95,#1,
+             x = metric_cutoff_level*0.95,
              angle = 0,
              color="red",
              label = metric_cutoff_label,
-             vjust = -1,
-             hjust = 0.0,
+             vjust = 0.0,#-0.25,
+             hjust = 1.0,
              parse = FALSE,
              alpha=0.75,
-             size=2) +
+             size=2.25) +
     # annotate("text", 
     #          y = 0, 
     #          x = max(weighted_medians$median_eroi), 

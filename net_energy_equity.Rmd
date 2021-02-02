@@ -363,7 +363,7 @@ choropleth_chart <- choropleth_map(
     upper_quantile_view,
     lower_quantile_view,
     chart_title,
-    chart_subtitle,
+    chart_subtitle=NULL,
     weighted_metrics=clean_top_metrics)
   # ggsave(figure_file, plot=choropleth_chart)
 # }
@@ -651,7 +651,7 @@ p6=top_line_charts[["density"]]
 
 ```{r density-charts, cache=FALSE, fig.cap="The distribution of net energy returns across different household characteristics."}
 grid.arrange(p1,p2,p3,p4,p5,p6, nrow=2,
-             top=chart_title, 
+             # top=chart_title, 
              # subtitle
              bottom="Proportion of Households", 
              left=metric_label)
