@@ -1,3 +1,5 @@
+options(timeout=120)
+
 paper_methods <- function(states="all",
                           acs_version=2018,
                           refresh=FALSE){
@@ -367,7 +369,12 @@ paper_methods <- function(states="all",
   if(!file.exists(tract_file_name)){
     get_tracts <- function(state_abbr, refresh=FALSE){
       # if we have saved them, then load them if refresh is FALSE
-      state_tracts <- tracts(cb = TRUE, year = 2016, class="sf", state=state_abbr, refresh=refresh)
+      print(paste0("getting shapefile for tracts in ",state_abbr))
+      state_tracts <- tracts(cb = FALSE, 
+                             year = acs_version, 
+                             class="sf", 
+                             state=state_abbr, 
+                             refresh=refresh)
       Sys.sleep(5)
       return(state_tracts)
     }
