@@ -243,7 +243,7 @@ density_chart <- function(graph_data,
                         # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
                       }
     )) + 
-    stat_ewcdf(geom='line',  alpha=1, na.rm=T, show.legend = NA, size=0.2) + 
+    stat_ewcdf(geom='line',  alpha=1, na.rm=T, show.legend = NA, size=0.1) + 
     stat_ewcdf(aes(ymin=..y.., ymax=1), geom='ribbon', alpha=.1, 
                na.rm=T, show.legend = NA) + 
     theme_minimal() + 
@@ -312,11 +312,11 @@ density_chart <- function(graph_data,
   geom_vline(xintercept = metric_cutoff_level,
              linetype="dotted",
              color = "red",
-             size=0.2,
+             size=0.5,
              alpha=0.75) +
     annotate("text",
              y = 0.95,#1,
-             x = metric_cutoff_level*0.95,
+             x = metric_cutoff_level*1.15,
              angle = 0,
              color="red",
              label = metric_cutoff_label,
@@ -324,7 +324,7 @@ density_chart <- function(graph_data,
              hjust = 1.0,
              parse = FALSE,
              alpha=0.75,
-             size=2.25) +
+             size=2.5) +
     # annotate("text", 
     #          y = 0, 
     #          x = max(weighted_medians$median_eroi), 
@@ -703,4 +703,101 @@ make_all_charts <- function(clean_data,
   return(list("density"=density_chart,
               # "choropleth"=choropleth_chart,
               "violin"=violin_chart))
+}
+
+
+scatter_chart <- function(graph_data, 
+                          metric_name, 
+                          metric_label,
+                          group_columns, 
+                          metric_cutoff_level, 
+                          metric_cutoff_label, 
+                          chart_title, 
+                          chart_subtitle,
+                          independent_variable
+  
+){
+  legend_title <- group_columns
+  if(!is.null(legend_title)){
+    # remove simplified_
+    legend_title <- gsub("simplified_","", legend_title, fixed=TRUE)
+    # normalize words
+    legend_title <- gsub("_"," ",legend_title,fixed=TRUE)
+    legend_title <- str_to_title(legend_title)
+    # combine
+    legend_title <- paste0(paste(legend_title, sep=" ", collapse=" &\n"))
+  }
+  print(legend_title)
+  
+  if(!is.null(group_columns)){
+    pal_n <- length(levels(interaction(graph_data[,group_columns])))
+  } else {
+    pal_n <- 1
+  }
+  
+  graph_data$group_name <- str_to_title(gsub("+"," &\n",
+                                             graph_data$group_name,fixed=TRUE))
+  
+  movie <- "Darjeeling1" #"GrandBudapest1"
+  #pal <- wes_palette(name=movie, n=pal_n, type="continuous")
+  pal <- sample(x=wes_palette(name=movie, n=pal_n, type="continuous"), 
+                size = pal_n, 
+                replace = FALSE)
+  
+  weighted_metrics <- calculate_weighted_metrics(graph_data, 
+                                                 group_columns, 
+                                                 metric_name, 
+                                                 metric_cutoff_level, 
+                                                 upper_quantile_view, 
+                                                 lower_quantile_view)
+  
+  
+  chart <- graph_data %>% 
+    ggplot(aes_string(x=metric_name, 
+                      y=independent_variable,
+                      weight="group_household_weights",
+                      color=if(is.null(group_columns)){group_columns}else{
+                        "group_name"
+                        #interaction(!!!sym(group_columns))
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                      },
+                      fill=if(is.null(group_columns)){group_columns}else{
+                        #interaction(!!!sym(group_columns))
+                        "group_name"
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                      },
+                      linetype=if(is.null(group_columns)){group_columns}else{
+                        #interaction(!!!sym(group_columns))
+                        "group_name"
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                      }
+    ))# + 
+  scatter_chart <- chart + 
+    stat_density_2d(aes(alpha = ..piece..), geom="polygon") +
+    guides(alpha = FALSE) +
+    stat_smooth(method = "lm", fullrange = TRUE) +
+    geom_rug() + 
+    scale_x_continuous(#name = "Monthly Electricity Cost", 
+                       #labels = scales::dollar_format(),
+                       #limits = c(0, 300), expand = c(0, 0)
+                       ) + 
+    scale_y_continuous(#name = "EROI", 
+                       #labels = scales::unit_format(unit = "x", scale = 1, accuracy = 1),
+                       #limits = c(0, 100), expand = c(0, 0)
+                       ) + 
+    theme_pubr() + #   theme(plot.margin = margin()) + 
+    theme(legend.position = "bottom") + 
+    theme_void() + 
+    theme(legend.position = "none") + 
+    labs(title = NULL, x=NULL, y=NULL) + 
+    ggtitle("Monthly Electricity Cost vs. EROI") + 
+    plot_spacer() + 
+    electricity_v_eroi_contour_plot + 
+    theme(legend.justification = c(1, 1), legend.position = c(1, 1), legend.title=element_blank()) + 
+    mean_eroi + 
+    coord_flip() + 
+    theme_void() + 
+    theme(legend.position = "none") + 
+    labs(title = NULL, x=NULL, y=NULL) + 
+    plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4))
 }
