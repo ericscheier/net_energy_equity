@@ -367,25 +367,36 @@ paper_methods <- function(states="all",
   
   tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
   if(!file.exists(tract_file_name)){
-    get_tracts <- function(state_abbr, refresh=FALSE){
-      # if we have saved them, then load them if refresh is FALSE
-      print(paste0("getting shapefile for tracts in ",state_abbr))
-      state_tracts <- tracts(cb = FALSE, 
-                             year = acs_version, 
-                             class="sf", 
-                             state=state_abbr, 
-                             refresh=refresh)
-      Sys.sleep(5)
-      return(state_tracts)
-    }
     
     tract_states <- states
     if(tract_states=="all"){
       tract_states <- list_all_states()
     }
     
-    all_census_tracts <- lapply(tract_states, get_tracts)
-    census_tracts <- do.call(rbind, all_census_tracts)
+    all_census_tracts <- lapply(tract_states[1:2], get_tracts, 
+                                year=acs_version, refresh=refresh)
+    # census_tracts <- do.call(rbind, all_census_tracts)
+    census_tracts <- rbind_tigris(all_census_tracts)
+    
+    # unique_state_counties <- unique(st_drop_geometry(census_tracts)[c("STATEFP","COUNTYFP")])
+    
+    # usc_list <- as.list(as.data.frame(t(unique_state_counties)))
+    
+    
+    # county_waters <- lapply(usc_list, 1, get_county_water,
+                           # year=acs_version,
+                           # refresh=refresh)
+    
+    # water_area <- do.call(rbind, county_waters)
+    # water_area <- st_union(unlist(county_waters))
+    # water_area <- do.call(st_union, county_waters)
+    
+    # all_water_area <- lapply(tract_states, get_state_water,
+    #                          year=acs_version, refresh=refresh)
+    # 
+    # water_area <- do.call(rbind, all_water_area)
+    
+    # census_tracts <- census_tracts %>% st_difference(st_union(water_area))
     
     census_tracts$gisjoin <- paste0("G",paste(census_tracts$STATEFP,
                                               census_tracts$COUNTYFP,

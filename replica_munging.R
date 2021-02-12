@@ -10,9 +10,9 @@ get_replica_dataset <- function(){
     download.file(file_url,desired_path, method="libcurl")
   }
   
-  data <- fread(desired_path, colClasses = "character") 
+  dataset <- fread(desired_path, colClasses = "character")
   #read_csv(desired_path)#, col_types = "character")
-  return(data)
+  return(dataset)
 }
 
 get_replica_supplemental_dataset <- function(col_types=NULL){
@@ -94,7 +94,10 @@ get_replica_supplemental_dataset <- function(col_types=NULL){
                                supplemental_only=TRUE,
                                col_types=col_types)
   
-  replica$geoid <- str_pad(as.character(replica$geoid), width=11, side="left", pad="0")
+  replica$geoid <- str_pad(as.character(replica$geoid), 
+                           width=11, 
+                           side="left", 
+                           pad="0")
   
   
   return(replica)

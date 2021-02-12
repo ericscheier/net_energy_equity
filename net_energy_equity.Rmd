@@ -74,7 +74,7 @@ acs_version <- 2018
 # geographic_scope <- "tract" #statecitycounty
 ```
 
-```{r run-methods}
+```{r run-methods, cache=FALSE}
 paper_methods(states=states,
               acs_version=acs_version,
               refresh=refresh)
@@ -654,7 +654,7 @@ grid.arrange(p1,p2,p3,p4,p5,p6, nrow=2,
              # top=chart_title, 
              # subtitle
              bottom="Proportion of Households", 
-             left=metric_label)
+             left=paste0(str_to_upper(metric_name)," (",metric_label,")"))
 ```
 
 
@@ -680,6 +680,123 @@ Examining these dynamics by the status of homeownership reveals further disparit
 Households with solar as a primary heating fuel have a higher net energy income ratio than those with other fuel sources, except for households far below the energy poverty line. Why are solar households not receiving the same benefits of their fuel source across the distribution of incomes? This could be due to the low consumption of lower-income households meaning that the potential savings from installing a renewable energy system are lower than for high-income households.
 
 ## Equity
+
+```{r eval=FALSE}
+weighted_medians <- clean_data %>%
+   group_by(housing_tenure) %>% 
+   summarise(median_electricity_spend = if( sum(!is.na(households))<3 ){NA} else { weighted.median(electricity_spend, households, na.rm=TRUE)},
+             median_eroi = if( sum(!is.na(households))<3 ){NA} else { weighted.median(mean_eroi, households, na.rm=TRUE)},
+            median_income = if( sum(!is.na(households))<3 ){NA} else { weighted.median(annual_income, households, na.rm=TRUE)},
+            median_electricity_price = if( sum(!is.na(households))<3 ){NA} else { weighted.median(implied_price_kWh, households, na.rm=TRUE)},
+            median_electricity_use = if( sum(!is.na(households))<3 ){NA} else { weighted.median(implied_electricity_use, households, na.rm=TRUE)},
+            median_energy_burden = if( sum(!is.na(households))<3 ){NA} else { weighted.median(mean_energy_burden, households, na.rm=TRUE)},
+            median_energy_cost = if( sum(!is.na(households))<3 ){NA} else { weighted.median(mean_energy_cost, households, na.rm=TRUE)}
+            )
+```
+
+
+```{r eval=FALSE}
+gwm <- grouped_weighted_metrics(graph_data=graph_data, 
+                                  group_columns=group_columns, 
+                                  metric_name=metric_name, 
+                                  metric_cutoff_level=metric_cutoff_level, 
+                                  upper_quantile_view=upper_quantile_view, 
+                                  lower_quantile_view=lower_quantile_view)
+gwm <- gwm %>% {if(!is.null(group_columns)) unite(., "group_name", all_of(group_columns), remove=FALSE, sep="+", na.rm=FALSE) else (mutate(., group_name="all"))}
+
+mean_eroi <- graph_data %>%
+  ggplot(aes_string(x=metric_name, 
+             weight="group_household_weights", 
+             fill="group_name", 
+             color="group_name")) + 
+  geom_density(alpha=0.1) + 
+  ggtitle("Household Energy Return on Investment By Utility Ownership Type") + 
+  scale_x_continuous(labels = scales::unit_format(unit = "x", scale = 1, accuracy = 1),
+                     breaks=seq(from=0,to=100,by=10), 
+                     minor_breaks=seq(from=0,to=100,by=1),
+                     limits=c(0,100), name="Household Energy Return on Investment\n(Income Earned for each Dollar Spent on Energy)") + 
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.05), name="Proportion of Households") + 
+  theme_minimal() + 
+  theme(legend.justification = c(1, 1), legend.position = c(1, 1), legend.title=element_blank()) + 
+  geom_vline(data=gwm, aes(xintercept=metric_median,  color=group_name),
+               linetype="solid", size=0.5, alpha=0.75) + 
+  geom_vline(xintercept = 10, linetype="dotted", 
+                color = "red", size=1.0, alpha=0.75)
+
+mean_eroi + annotate("text", x = 10, y = 0.0075/3, angle = 90, color="red", label = "Energy Poverty Line", 
+    vjust = -0.5, parse = FALSE, alpha=0.75) + 
+  annotate("text", x = min(weighted_medians$median_eroi), y = 0.005/3, angle = 90, color="gray25", label = "Median", 
+    vjust = -0.5, parse = FALSE, alpha=0.75)
+```
+
+
+```{r eval=FALSE}
+independent_variable <- "replica_mwh"
+electricity_v_eroi_contour_plot <- graph_data %>% 
+  ggplot(aes_string(x=independent_variable,
+                    y=metric_name,
+             weight="group_household_weights", 
+             fill="group_name", 
+             color="group_name")) +
+  stat_density_2d(aes(alpha = ..piece..), geom="polygon", na.rm=TRUE) +
+  guides(alpha = FALSE) +
+  stat_smooth(method = "lm", fullrange = TRUE) +
+  # geom_rug() + 
+  scale_x_continuous(name = "Monthly Electricity Cost", 
+                     labels = scales::dollar_format(),
+                     limits = c(0, 1000), expand = c(0, 0)) + 
+  scale_y_continuous(name = "EROI", 
+                     labels = scales::unit_format(unit = "x", scale = 1, accuracy = 1),
+                     limits = c(0, 100), expand = c(0, 0)) + 
+  theme_pubr() + #   theme(plot.margin = margin()) + 
+  theme(legend.position = "bottom")
+electricity_v_eroi_contour_plot
+```
+
+
+```{r eval=FALSE}
+electricity_spend + theme_void() + theme(legend.position = "none") + labs(title = NULL, x=NULL, y=NULL) + 
+  ggtitle("Monthly Electricity Cost vs. EROI") + 
+  plot_spacer() + 
+  electricity_v_eroi_contour_plot + theme(legend.justification = c(1, 1), legend.position = c(1, 1), legend.title=element_blank()) + 
+  mean_eroi + coord_flip() + theme_void() + theme(legend.position = "none") + labs(title = NULL, x=NULL, y=NULL) + 
+  plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4))
+```
+
+
+```{r eval=FALSE}
+# Monthly Electricity Expenditures
+electricity_spend <- clean_data %>%
+  ggplot(aes(x=electricity_spend, weight=ownership_type_household_weights/3, fill=ownership_type, color=ownership_type)) + 
+  geom_density(alpha=0.1) + 
+  ggtitle("Household Monthly Electricity Spending By Utility Ownership Type") + 
+  scale_x_continuous(labels = scales::dollar_format(), limits=c(0,300), name="Energy Spend",
+                     breaks=seq(from=0,to=300,by=50), 
+                     minor_breaks=seq(from=0,to=300,by=10)) + 
+  scale_y_continuous(labels = scales::percent_format(accuracy = 0.0005), name="Proportion of Households") + 
+  theme_minimal() + 
+  theme(legend.justification = c(1, 1), legend.position = c(1, 1), legend.title=element_blank()) + 
+  geom_vline(data=weighted_medians, aes(xintercept=median_electricity_spend,  color=ownership_type),
+               linetype="solid", size=0.5, alpha=0.75)
+
+electricity_spend + annotate("text", x = min(weighted_medians$median_electricity_spend), y = 0.0025/3, angle = 90, color="gray25", label = "Median",vjust = -0.5, parse = FALSE, alpha=0.75)
+```
+
+
+
+```{r eval=FALSE}
+s1 <- scatter_chart(graph_data, 
+                          metric_name, 
+                          metric_label,
+                          group_columns, 
+                          metric_cutoff_level, 
+                          metric_cutoff_label, 
+                          chart_title, 
+                          chart_subtitle,
+                          independent_variable="group_households")
+s1
+```
+
 
 ```{r eval=FALSE}
 # Compare maps of energy burden vs. solar rooftop potential
