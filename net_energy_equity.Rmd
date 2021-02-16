@@ -664,14 +664,7 @@ grid.arrange(p1,p2,p3,p4,p5,p6, nrow=2,
 # show some pie / bar charts of the breakdown between fuels
 ```
 
-The REPLICA and LEAD datasets allow us to estimate the NER for each census tract in the United States. From this high level we can see in [overal distribution figure] that approximately `r scales::percent(energy_poverty_rate, accuracy=1)` of households in the United States are experiencing energy poverty. Displayed geospatially in Figure \@ref(fig:continental-map), it is clear that...
-
-+ Detroit
-+ Black belt
-+ heating oil in northwest
-+ urban inequity results in lower NER washing out in many dense or gentrified urban areas
-+ Border populations / immigrant populated areas have higher burdens
-+ Native American lands have higher burdens
+The REPLICA and LEAD datasets allow us to estimate the NER for each census tract in the United States. From this high level we can see in [overall distribution figure] that approximately `r scales::percent(energy_poverty_rate, accuracy=1)` of households in the United States are experiencing energy poverty. Displayed geospatially in Figure \@ref(fig:continental-map), it is clear that the Black Belt in the American Southeast is visibly perceptible, indicating that low-NER follows racial lines in areas where inexpensive energy is available and energy burdens are more dependent on housing quality and patterns of consumption than they are dependent on price. Likewise, border populations and immigrant-populated areas in the Southwest have higher burdens, as do Native American lands. The use of heating oil in the Northwest can be seen through the prevelance of low-NER communities in this area, since heating oil is a notably expensive and inefficienct source of heating commonly used in this region. Urban inequity results in lower NER populations not showing up in in many dense or gentrified urban areas such as the San Francisco Bay Area and New York City. A notable exception to this trend is Detroit, in which the pervasiveness of urban energy poverty has been studied extensively and shown to have distinct geographic boundaries. While some of these conclusions are supported by existing evidence and literature, they should be confirmed with a rigorous analysis of this dataset using the NER metric for reasons explained in [section describing metric].
 
 Subsetting by those communities defined by their relationship to the Federal Poverty line provides a stark picture. While `r scales::percent(in_both_poverty, accuracy=1)` of households below the federal poverty line also face energy poverty, fewer than `r scales::percent(in_only_energy_poverty, accuracy=0.01)` of those above the federal poverty line face this scarcity, underscoring the relative burden of energy expenditures as a poverty trap. When we break the group of relatively prosperous households above the poverty line into subsets we find that X of households living at 100-150% of the Federal Poverty Line are experiencing energy poverty. This suggests that energy poverty may be a useful metric for identifying households at risk of other forms of poverty. However, we do find that most households experiencing energy poverty are also suffering from a broader lack of access to resources characterized by income-based poverty. Given that the quality of energy used by low-income households is expected to be of similar inherent usefulness, this stark contrast in net energy return on the households’ energy investments is surprising.
 
@@ -844,7 +837,7 @@ How about ME, MS, AL, VT, CT, RI?
 
 Also, how about states such as Connecticut where higher than average electricity prices may pose affordability threats for communities affected by higher prices. But, states such as ME that continue to utilize residential heating energy sources such as oil and fuelwood will suffer not only from lack of efficiency but health impacts.
 
-Poverty rates in AL and MS perpetuate through the electricity sector. Not only are households falling behind in terms of income, but energy represents a greater share of household expenditures than neighboring states and other parts of the country.
+Poverty rates in AL and MS permeate through the electricity sector. Not only are households falling behind in terms of income, but energy represents a greater share of household expenditures than neighboring states and other parts of the country.
 
 CA and CO are not immune to these problems, but likely represent a greater spread and diversity of energy affordability impacts. Also, advances in clean energy legislation in states such as CA, CO, HI, DC, WA are a common thread, signaling the value of strong decarbonization targets and accompanying policies to ensure electricity affordability for low-income households.
 
@@ -871,7 +864,7 @@ y <- make_violin_chart(graph_data=graph_data,
 print(y)
 ```
 
-“To call the U.S. grid balkanized would insult the Macedonians.” - Marc L. Spitzer, a former member of the Federal Energy Regulatory Commission
+“To call the U.S. grid balkanized would insult the Macedonians.” - Marc L. Spitzer, former member of the Federal Energy Regulatory Commission
 
 https://www.nytimes.com/2013/07/13/us/ideas-to-bolster-power-grid-run-up-against-the-systems-many-owners.html
 
