@@ -243,9 +243,9 @@ density_chart <- function(graph_data,
                         # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
                       }
     )) + 
-    stat_ewcdf(geom='line',  alpha=1, na.rm=T, show.legend = NA, size=0.1) + 
-    stat_ewcdf(aes(ymin=..y.., ymax=1), geom='ribbon', alpha=.1, 
-               na.rm=T, show.legend = NA) + 
+    ggrastr::rasterise(stat_ewcdf(geom='line',  alpha=1, na.rm=T, show.legend = NA, size=0.1)) + 
+    ggrastr::rasterise(stat_ewcdf(aes(ymin=..y.., ymax=1), geom='ribbon', alpha=.1, 
+               na.rm=T, show.legend = NA)) + 
     theme_minimal() + 
     scale_color_manual(name=legend_title, values=pal) + 
     scale_fill_manual(name=legend_title, values=pal) + 
@@ -488,29 +488,49 @@ choropleth_map <- function(
   lower_quantile_view,
   chart_title,
   chart_subtitle,
-  weighted_metrics
+  weighted_metrics,
+  include_basemap=TRUE
 ){
   # cloropleth map by census tract
-  centroids <- st_coordinates(st_centroid(clean_data$geometry)) %>% data.frame()
+  clean_data <- st_transform(clean_data, 4326)
+  b <- st_bbox(clean_data,crs=3857)
+  names(b) <- c("left","bottom","right","top")
+  clean_data <- st_transform(clean_data, 3857)
+  # centroids <- st_coordinates(st_centroid(clean_data$geometry)) %>% data.frame()
   
   guide_name <- paste0(c("Median ",toupper(metric_name)," (",metric_label,")"),collapse="")
   # centroids <- centroids[is.finite(rowSums(centroids)),]
   
   # center_centroid <- st_centroid()
+  map_data <- clean_data[,c("metric_median", "geometry", "state_fips")]
   
-  o <- clean_data[,c("metric_median", "geometry", "state_fips")] %>% 
-    ggplot() + 
-    geom_sf(aes(fill=metric_median),
-            # size=0.005, 
-            color=NA,#"white"
-            alpha=0.9) + 
-    geom_sf(fill = "transparent", color = "#7B7D7B", #"gray20", 
-            size = 0.05, 
-            data = . %>% group_by(state_fips) %>% summarise()) +
-    coord_sf(crs = 4326, #26945, #
-             xlim = c(min(centroids$X), max(centroids$X)), 
-             ylim = c(min(centroids$Y), max(centroids$Y)), 
-             expand = TRUE)
+  basemap <- ggplot()
+  
+  if(include_basemap){
+    
+    # https://stackoverflow.com/questions/52704695/is-ggmap-broken-basic-qmap-produces-arguments-imply-differing-number-of-rows
+    basemap_files <- get_stamenmap(bbox=b, 
+                                zoom=calc_zoom(b, adjust=as.integer(0)),
+                                maptype="toner-background")
+    
+    basemap_files <- ggmap_bbox(basemap_files)
+    
+    basemap <- ggmap(basemap_files)
+  }
+  
+  o <- basemap + geom_sf_rast(
+    geom_sf(data=map_data, aes(fill=metric_median, color=metric_median),
+            size=0.1,
+            # color=NA,#"white"
+            alpha=0.8,
+            inherit.aes = FALSE), dpi=NULL, dev=NULL) + 
+    geom_sf(fill = "transparent", color = "#7B7D7B", #"gray20",
+            size = 0.075,
+            data = map_data %>% group_by(state_fips) %>% summarise()) #+
+    # coord_sf(crs = 4326, #26945, #
+    #          xlim = c(b['left'], b['right']),
+    #          ylim = c(b['bottom'], b['top']),
+    #          expand = TRUE)
   
   color_values <- as.numeric(sort(c(
     # weighted_metrics$metric_lower,
@@ -530,73 +550,38 @@ choropleth_map <- function(
     theme_void() +
     # scale_colour_identity(
     # scale_fill_identity() +
-    scale_fill_gradientn(#) +
-      # scale_fill_gradient(low = "#616161", high = "white",
-      # scale_fill_gradient2(
-      # scale_fill_continuous(
-      # low = muted("red"), mid = "white",
-      # high = muted("blue"), midpoint = ner_poverty_line,
-      # name="Net Income per Energy Spend ($/kWh)",
-      # colors = c("#ff5252","#ff5252","#fff176","#228b22","#228b22"),
-      colors = c(#"#C83130","#C7C830","#31C831"
-                 # "#8B2221","#8B5621","#228B22"
-                 # "#B22C2C","#B26F2C","#279F27"
-                 "#B22C2C","#B26F2C","#B2B22C","#2CB2B2","#2C6FB2","#2C2CB2"
-                 # "#9F2727","#9F6327","#629F27"
-                #"#8B2156",
-                 # "#8B2221",
-                 # "#8B5621",
-                 # "#8A8B21",
-                 # "#568B21"#,
-                 # "#228b22"#,
-                 # "#21218B"
-                 ),
+    scale_color_gradientn(
+      colors = c("#B22C2C",
+                 "#B26F2C",
+                 "#B2B22C",
+                 "#2CB2B2",
+                 "#2C6FB2",
+                 "#2C2CB2"),
       limits = c(weighted_metrics$metric_lower,weighted_metrics$metric_upper),
-      # na.value = "black",
-      # na.value = "#616161",
       values = color_values,
-      # guide = guide_colorbar(direction="horizontal",
-      # title.position = 'bottom'
-      # )
-      # ) +
-      # scale_fill_viridis(option="plasma",#"cividis",#"inferno",#"magma",#"viridis",#
-      # trans="log",
-      # breaks=color_values, 
-      # colors = c("#ff5252","#ff5252","#fff176","#228b22","#228b22"),
-      # na.value = "black",
-      na.value = "#B3B3B3", # ", #808080",#"#D3D3D3",#"#616161",#
-      # breaks = color_values,
-      # minor_breaks = NULL, 
+      na.value = "#B3B3B3",
+      guide = FALSE,
+      name=FALSE
+    )+
+    scale_fill_gradientn(
+      colors = c("#B22C2C",
+                 "#B26F2C",
+                 "#B2B22C",
+                 "#2CB2B2",
+                 "#2C6FB2",
+                 "#2C2CB2"),
+      limits = c(weighted_metrics$metric_lower,weighted_metrics$metric_upper),
+      values = color_values,
+      na.value = "#B3B3B3",
       guide = guide_colorbar(direction="horizontal",
                              title.position = 'bottom'),
       name=guide_name) +
-    #keywidth=unit(4, units = "mm"),
-    # label.position = "bottom",
-    # , nrow=1) ) +
-    
     labs(
       title = chart_title,
       subtitle = chart_subtitle#,
       # caption = "Data: NREL" # | Creation: Eric Scheier | emergi.eco"
     ) +
     theme(
-      # text = element_text(color = "#22211d"),
-      # plot.background = element_rect(fill = "#f5f5f2", color = NA),
-      # panel.background = element_rect(fill = "#f5f5f2", color = NA),
-      # legend.background = element_rect(fill = "#f5f5f2", color = NA),
-      
-      # plot.title = element_text(size= 22, 
-      #                           hjust=0.01, 
-      #                           color = "#4e4d47", 
-      #                           margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
-      # plot.subtitle = element_text(size= 17, 
-      #                              hjust=0.01, 
-      #                              color = "#4e4d47", 
-      #                              margin = margin(b = -0.1, t = 0.43, l = 2, unit = "cm")),
-      # plot.caption = element_text( size=12, 
-      #                              color = "#4e4d47", 
-      #                              margin = margin(b = 0.3, r=-99, unit = "cm") ),
-      
       legend.position = c(0.20, 0.15)
     ) #+
   #coord_map()

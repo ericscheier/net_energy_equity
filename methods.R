@@ -373,10 +373,12 @@ paper_methods <- function(states="all",
       tract_states <- list_all_states()
     }
     
-    all_census_tracts <- lapply(tract_states[1:2], get_tracts, 
-                                year=acs_version, refresh=refresh)
-    # census_tracts <- do.call(rbind, all_census_tracts)
-    census_tracts <- rbind_tigris(all_census_tracts)
+    all_census_tracts <- lapply(tract_states, get_tracts, 
+                                year=acs_version,
+                                refresh=refresh,
+                                remove_water=FALSE)
+    census_tracts <- do.call(rbind, all_census_tracts)
+    # census_tracts <- rbind_tigris(all_census_tracts)
     
     # unique_state_counties <- unique(st_drop_geometry(census_tracts)[c("STATEFP","COUNTYFP")])
     

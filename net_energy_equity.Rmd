@@ -44,7 +44,7 @@ knitr::opts_chunk$set(comment='##',
                       error=ifelse(is_preview,FALSE,is_draft),
                       results=ifelse(is_final,'hide',ifelse(is_preview,'hide','asis')),
                       fig.keep='last',
-                      dev='pdf',
+                      dev='cairo_pdf',#'pdf',
                       fig.show='hold',
                       message=ifelse(is_preview,FALSE,is_draft),
                       include=ifelse(is_preview,TRUE,is_draft),
@@ -238,7 +238,7 @@ fpl_top_metrics <- grouped_weighted_metrics(fpl_graph_data,
                          group_columns="in_poverty", 
                          metric_name, 
                          metric_cutoff_level, 
-                         upper_quantile_view=0.99, 
+                         upper_quantile_view=1.00, 
                          lower_quantile_view=0.00)
 # should replace this with weighted metrics data
 # How many households are below the poverty line in this data?
@@ -257,11 +257,23 @@ in_both_poverty <- pct_in_poverty[2]
 in_only_energy_poverty <- pct_in_poverty[1]
 
 energy_poverty_rate <- sum(number_in_poverty) / sum(total_households)
+
+ami_graph_data <- filter_graph_data(clean_data_ami,
+                                    group_columns=c("in_poverty",
+                                                    "income_bracket"),
+                                    metric_name)
+ami_top_metrics <- grouped_weighted_metrics(ami_graph_data, 
+                         group_columns=c("in_poverty",
+                                         "income_bracket"), 
+                         metric_name, 
+                         metric_cutoff_level,
+                         upper_quantile_view=1.00, 
+                         lower_quantile_view=0.00) 
 ```
 
 ---
 abstract: |
-  Energy poverty in the United States is an issue of increasing prevalence. While large datasets exist to analyze household incomes, expenditures, and energy options for households, few consistent metrics exist to evaluate the energy burden of typical U.S. households. Here, we develop a framework using net energy analysis and socioeconomic data from the American Community Survey to observe systematic energy inequity and create a net energy poverty line in the United States. We find substantial instances of energy poverty in the United States -- `r scales::percent(energy_poverty_rate, accuracy=1)` of households experience energy poverty. While `r scales::percent(in_both_poverty, accuracy=1)` of households below the federal poverty line also face energy poverty, fewer than `r scales::percent(in_only_energy_poverty, accuracy=0.01)` of those above the federal poverty line face this scarcity. We also identify and document further disparities in community net energy return, where energy expenditures in the US disproportionately burden those in the black belt across the Southeastern U.S., Hispanic communities near the U.S.-Mexico border, and Native American lands. Further disparities suggest that for solar, wind, and energy efficiency upgrades to improve socioeconomic mobility, programs must reduce relative energy expenditures through improved conservation measures, efficiency upgrades, and access to distributed renewables. We recommend the United States develop and implement a federal energy poverty line.
+  Energy poverty in the United States is an issue of increasing prevalence. While large datasets exist to analyze household incomes, expenditures, and energy options for households, few consistent metrics exist to evaluate the energy burden of typical U.S. households. Here, we develop a framework using net energy analysis and socioeconomic data from the American Community Survey to observe systematic energy inequity and create a net energy poverty line in the United States. We find substantial instances of energy poverty in the United States -- `r scales::percent(energy_poverty_rate, accuracy=1)` of households experience energy poverty. While `r scales::percent(in_both_poverty, accuracy=1)` of households below the federal poverty line also face energy poverty, fewer than `r scales::percent(in_only_energy_poverty, accuracy=0.01)` of those above the federal poverty line face this scarcity. We also identify and document further disparities in community net energy return, where energy expenditures in the US disproportionately burden those in the Black Belt across the Southeastern U.S., Hispanic communities near the U.S.-Mexico border, and Native American lands. Further disparities suggest that for solar, wind, and energy efficiency upgrades to improve socioeconomic mobility, programs must reduce relative energy expenditures through improved conservation measures, efficiency upgrades, and access to distributed renewables. We recommend the United States develop and implement a federal energy poverty line.
 ---
 
 Energy is becoming increasingly unaffordable for American households. In the United States, energy poverty is now a significant challenge as families struggle to meet monthly bills and live paycheck to paycheck[@bednarRecognitionResponseEnergy2020]. Even with rapid declines in technology costs for cleaner, renewable electricity generation options, many households cannot take advantage of technological innovations and advancements such as low-cost rooftop solar or energy efficiency upgrades that improve air quality, lower greenhouse gas emissions, and increase direct household savings[@castellanosRooftopSolarPhotovoltaic2017]. Rooftop solar may be capital intensive, and although the investments may recoup costs, many times a lack of knowledge and experience act as a barrier to implementation. Similarly, for households living in older buildings, the ability to make improvements to building HVAC systems and efficiency changes may require awareness and resources that are left out from current discussions. 
@@ -320,7 +332,7 @@ It stands to reason that a household or community’s prosperity will be broadly
 
 Even if one were to discount the direct adverse effects for those households experiencing high energy burdens, the societal cost of placing excessive negative pressures on these groups may be high[@]. Unaffordable energy has been shown to be negatively related to social cohesion, climate change responses, and disproportionate environmental impacts on low-income populations and minority groups [@carleyJusticeEquityImplications2020]. These connections could have significant implications for navigating sustainable development and meeting societal goals around decarbonization and energy use.
 
-Conversely, we seem to be at a potential inflection point for the promotion of equitable energy prosperity. Primarily this is due to the rapid cost decline and technological improvements in modular digital components for households (solar photovoltaics, battery storage, light-emitting diodes). The energy system has little history of individual ownership of its assets or competition at the grid edge[@waraCompetitionGridEdge2016]. It is now possible to provide most of the necessary energy services to a household at a lower cost than the existing electric grid by assembling a technology stack with approximately the same size and cost of ownership as a motor vehicle. This opportunity is not available equally to everyone. Lower-income households are at risk of paying more for energy if those ablest to pay the cost of defection from the existing grid do so[@barboseBenefitsCostsUtilityownership2020]. We need to understand the dynamics of energy burden and whether we face an opportunity to alleviate it.
+Conversely, we seem to be at a potential inflection point for the promotion of equitable energy prosperity. Primarily this is due to the rapid cost decline and technological improvements in modular digital components for households (solar photovoltaics, battery storage, light-emitting diodes, heat pumps, cooking surfaces, and information technology). The energy system has little history of individual ownership of its assets or competition at the grid edge[@waraCompetitionGridEdge2016]. It is now possible to provide most of the necessary energy services to a household at a lower cost than the existing electric grid by assembling a technology stack with approximately the same size and cost of ownership as a motor vehicle. This opportunity is not available equally to everyone. Lower-income households are at risk of paying more for energy if those ablest to pay the cost of defection from the existing grid do so[@barboseBenefitsCostsUtilityownership2020]. We need to understand the dynamics of energy burden and whether we face an opportunity to alleviate it.
 
 While energy affordability has received attention especially over the past decade, the issue lacks a set of widely accepted metrics that can suitably describe all of these dimensions[@linDoesEnergyPoverty2020a]. Frequently used metrics do not tell the whole story. For instance, the simple proportion of a household’s income spent on energy bills does not capture the underlying monthly cash flow patterns that may stress household budgets. If the household is above an energy poverty line defined by this metric for public policy purposes, the family may not receive critical support. Therefore, stakeholders have limited knowledge of which historical interventions have effectively promoted the energy system's affordability, and a likewise limited ability to design new interventions for this issue and the others linked to it. 
 
@@ -349,7 +361,7 @@ clean_top_metrics <- grouped_weighted_metrics(graph_data %>%
 
 
 
-```{r continental-map, fig.cap="Map of the median net earned income per secondary energy expenditure for each census tract in the continental United States. Shades of yellow and red indicate communities at or below the energy poverty line as defined by spending 10% or more of household income on secondary energy (NER<=9)."}
+```{r continental-map, cache=FALSE, fig.cap="Map of the median net earned income per secondary energy expenditure for each census tract in the continental United States. Shades of yellow and red indicate communities at or below the energy poverty line as defined by spending 10% or more of household income on secondary energy (NER<=9)."}
 # figure_name <- "choropleth_map"
 # figure_file <- paste0("figures/",figure_name,".png")
 # if(!file.exists(figure_file) || refresh){
@@ -364,7 +376,8 @@ choropleth_chart <- choropleth_map(
     lower_quantile_view,
     chart_title,
     chart_subtitle=NULL,
-    weighted_metrics=clean_top_metrics)
+    weighted_metrics=clean_top_metrics,
+    include_basemap = FALSE)
   # ggsave(figure_file, plot=choropleth_chart)
 # }
 choropleth_chart
@@ -410,7 +423,7 @@ This metric represents the net earnings a household receives for every expenditu
 
 ## Developing New Metrics
 
-From these metrics we can create all of the relevant energy ratios [these should be renamed to reflect the vocabulary of [@brandtGeneralMathematicalFramework2011]]:
+From these metrics we can create all of the relevant energy ratios:
 
 + Energy burden is the proportion of income spent on energy:
 
@@ -426,12 +439,6 @@ EROI = \frac{G_{income}}{S_{energy}}
 EROI = (Energy\ Burden)^{-1}
 \]
 
-
-+ Net Energy Ratio (or Net Energy Return) (NER) prevents the double counting of energy expenditures found in Energy Burden:
-\[
-NER = \frac{G_{income}-S_{energy}}{S_{energy}}
-\]
-
 + Discretionary Energy Availability Rate (DEAR) identifies what proportion of household income remains after energy bills have been paid: 
 \[
 DEAR = \frac{G_{income}-S_{energy}}{G_{income}}
@@ -440,43 +447,44 @@ DEAR = \frac{G_{income}-S_{energy}}{G_{income}}
 DEAR = 1 - Energy\ Burden
 \]
 
++ Net Energy Ratio (or Net Energy Return) (NER) prevents the double counting of energy expenditures found in Energy Burden and DEAR:
+\[
+NER = \frac{G_{income}-S_{energy}}{S_{energy}}
+\]
 
-Of the above metrics, the Net Energy Return (NER) and Discretionary Energy Availability Rate (DEAR) are the most desirable for our assessment. The DEAR is nicely bound between 0-100%, while the NER is the standard metric of Net Energy Analysis because it aligns with physical reality. EROI is a precursor of NER which has been replaced due to the increased focus on "net" rather than "gross" energy returns. Energy Burden is the metric du jour in the energy insecurity literature, which most of the references in the introduction are based on.
+Of the above metrics, the Net Energy Return (NER) and Discretionary Energy Availability Rate (DEAR) are the most desirable for our assessment. The DEAR is nicely bound between 0-100% as a ratio that relates the available income remaining after bills are paid. The NER is the standard metric of Net Energy Analysis because it reflects the role of energy as an input to a value-generating process in ecosystems. EROI is a precursor of NER which has been replaced due to the increased focus on "net" rather than "gross" energy returns. Energy Burden is the metric of choice in the energy insecurity literature. It is a highly interpretable metric which helps policymakers and researchers understand the distribution and impacts of energy poverty throughout communities.
 
-Of these metrics we will primarily examine the Net Energy Return, as it is the primary indicator in the study of macro-energy systems like the U.S. residential housing stock. Other proposed indicators of energy poverty may be similarly examined in this manner. While all of the aforementioned ratios are hyperbolic parabaloids, NER has several useful mathematical properties in that it can smoothly handle systems with:
-- negative incomes and energy costs
-- zero energy cost
-- zero income
-- extreme values
+Of these metrics we will primarily examine the Net Energy Return, as it is the primary indicator in the study of macro-energy systems like the U.S. residential housing stock. While all of the aforementioned ratios are hyperbolic parabaloids, NER has several useful mathematical properties in that it can smoothly handle systems with negative incomes and energy costs, zero energy cost, zero income, and extreme values of incomes and energy costs.
 
-For the discussion of household energy poverty we are primarily interested in how households of different characteristics are distributed according to their Net Energy Returns, which represents how many net dollars are earned by a household for every dollar they spend on energy. In this context we will refer to NER as the Community Net Energy Return due to the community-wide scope of the results.
+For the discussion of household energy poverty we are primarily interested in how households of different characteristics are distributed according to their Net Energy Returns, which represents how many net dollars are earned by a household for every dollar they spend on energy. In this context we will refer to NER as the Community Net Energy Return due to the community-wide scope of the underlying data used for this analysis. Other proposed indicators of energy poverty may be similarly examined in this manner. 
 
 
 ## Application to energy poverty
 
-Energy burden can be portrayed in net energy terms [rephrase equations in terms of the variable names used above]:
+Energy burden can be portrayed in net energy terms:
 
 \[
-return_{energy,net} = \frac{income_{gross}-spending_{energy}}{spending_{energy}} = \frac{income_{net_{energy}}}{spending_{energy}}
+NER_{community} = \frac{G_{income}-S_{energy}}{S_{energy}}
 \]
+
 
 Energy poverty is commonly defined as an expenditure of greater than 10% of household income on energy[@bednarRecognitionResponseEnergy2020]:
 
 \[
-burden_{energy}^{*} = \frac{spending_{energy}}{income_{gross}} > 10%
+Energy\ Burden^{*} = \frac{S_{energy}}{G_{income}} > 10\%
 \] 
 
 . This level will be referred to as the “Energy Poverty Line.” Translated into its relative level for net energy return, the energy poverty line ner* is defined as:
 
 \[
-return_{energy_{net}}^{*} = \frac{income_{gross}-spending_{energy}}{spending_{energy}} 
-s.t. \frac{spending_{energy}}{income_{gross}} > 10\%
+NER^{*} = \frac{G_{income}-S_{energy}}{S_{energy}} 
+s.t. \frac{S_{energy}}{G_{income}} > 10\%
 \]
 \[
-return_{energy_{net}}^{*} = 9.0
+NER^{*} = 9.0 = Energy\ Poverty\ Line
 \]
 
-This means that a household which earns fewer than 9 dollars for every dollar it spends on secondary energy will be considered to be in energy poverty by the traditional energy burden accounting method. Since the NER is unitless but has this intuitive meaning, we present it below without units. We examine the net energy return at a community scale across the United States below.
+This means that a household which earns fewer than 9 dollars of income for every dollar it spends on secondary energy will be considered to be in energy poverty by the traditional energy burden accounting method. Since the NER is unitless but has this intuitive meaning, we present it below in units of "$/$". We examine the net energy return at a community scale across the United States below.
 
 ```{r}
 # violin plot of all of the states with all (4?) scaled metrics and compared (from ML project)
@@ -500,7 +508,7 @@ clean_data_fpl$simplified_primary_heating_fuel <- as.factor(ifelse(clean_data_fp
 
 clean_data_ami$all <- as.factor("all")
 
-clean_data_ami <- left_join(clean_data_ami, replica_sup[c("geoid","company_ty","locale")], by=c("geoid"))
+clean_data_ami <- dplyr::left_join(clean_data_ami, replica_sup[c("geoid","company_ty","locale")], by=c("geoid"))
 
 clean_data_ami$simplified_company_type <- ifelse(clean_data_ami$company_ty %in% c("Coop","DistCoop"),
                                                  "Cooperative",
@@ -664,13 +672,19 @@ grid.arrange(p1,p2,p3,p4,p5,p6, nrow=2,
 # show some pie / bar charts of the breakdown between fuels
 ```
 
-The REPLICA and LEAD datasets allow us to estimate the NER for each census tract in the United States. From this high level we can see in [overall distribution figure] that approximately `r scales::percent(energy_poverty_rate, accuracy=1)` of households in the United States are experiencing energy poverty. Displayed geospatially in Figure \@ref(fig:continental-map), it is clear that the Black Belt in the American Southeast is visibly perceptible, indicating that low-NER follows racial lines in areas where inexpensive energy is available and energy burdens are more dependent on housing quality and patterns of consumption than they are dependent on price. Likewise, border populations and immigrant-populated areas in the Southwest have higher burdens, as do Native American lands. The use of heating oil in the Northwest can be seen through the prevelance of low-NER communities in this area, since heating oil is a notably expensive and inefficienct source of heating commonly used in this region. Urban inequity results in lower NER populations not showing up in in many dense or gentrified urban areas such as the San Francisco Bay Area and New York City. A notable exception to this trend is Detroit, in which the pervasiveness of urban energy poverty has been studied extensively and shown to have distinct geographic boundaries. While some of these conclusions are supported by existing evidence and literature, they should be confirmed with a rigorous analysis of this dataset using the NER metric for reasons explained in [section describing metric].
+The REPLICA and LEAD datasets allow us to estimate the NER for each census tract in the United States. From this high level we can see in Figure \@ref(fig:density-charts) that approximately `r scales::percent(energy_poverty_rate, accuracy=1)` of households in the United States are experiencing energy poverty. Displayed geospatially in Figure \@ref(fig:continental-map), it is clear that the Black Belt in the American Southeast is visibly perceptible, indicating that low-NER follows racial lines in areas where inexpensive energy is available and energy burdens are more dependent on housing quality and patterns of consumption than they are dependent on price. Likewise, border populations and immigrant-populated areas in the Southwest have higher burdens, as do Native American lands. The use of heating oil in the Northwest can be seen through the prevelance of low-NER communities in this area, since heating oil is a notably expensive and inefficienct source of heating commonly used in this region. Urban inequity results in lower NER populations not showing up in in many dense or gentrified urban areas such as the San Francisco Bay Area and New York City. A notable exception to this trend is Detroit, in which the pervasiveness of urban energy poverty has been studied extensively and shown to have distinct geographic boundaries. While some of these conclusions are supported by existing evidence and literature, they should be confirmed with a rigorous analysis of this dataset using the NER metric for reasons explained in [section describing metric].
 
-Subsetting by those communities defined by their relationship to the Federal Poverty line provides a stark picture. While `r scales::percent(in_both_poverty, accuracy=1)` of households below the federal poverty line also face energy poverty, fewer than `r scales::percent(in_only_energy_poverty, accuracy=0.01)` of those above the federal poverty line face this scarcity, underscoring the relative burden of energy expenditures as a poverty trap. When we break the group of relatively prosperous households above the poverty line into subsets we find that X of households living at 100-150% of the Federal Poverty Line are experiencing energy poverty. This suggests that energy poverty may be a useful metric for identifying households at risk of other forms of poverty. However, we do find that most households experiencing energy poverty are also suffering from a broader lack of access to resources characterized by income-based poverty. Given that the quality of energy used by low-income households is expected to be of similar inherent usefulness, this stark contrast in net energy return on the households’ energy investments is surprising.
+Subsetting by those communities defined by their relationship to the Federal Poverty line provides a stark picture. While `r scales::percent(in_both_poverty, accuracy=1)` of households below the federal poverty line also face energy poverty, fewer than `r scales::percent(in_only_energy_poverty, accuracy=0.01)` of those above the federal poverty line face this scarcity, underscoring the relative burden of energy expenditures as a poverty trap. When we break the group of relatively prosperous households into subsets we find that `r scales::percent(as.numeric(ami_top_metrics[ami_top_metrics$income_bracket=="low_mod","households_below_cutoff"])/as.numeric(ami_top_metrics[ami_top_metrics$income_bracket=="low_mod","household_count"]),accuracy=1)` of households living at 30-80% of their Area Median Income are experiencing energy poverty. This suggests that energy poverty may be a useful metric for identifying households at risk of other forms of poverty. However, we do find that most households experiencing energy poverty are also suffering from a broader lack of access to resources characterized by income-based poverty. Given that the quality of energy used by low-income households is expected to be of similar inherent usefulness, this stark contrast in net energy return on the households’ energy investments is surprising.
 
 Examining these dynamics by the status of homeownership reveals further disparities. Though renters and homeowners are similarly distributed below the energy poverty line, there appears to be a clear advantage of homeownership from a net energy perspective for most of the population. Only at a relatively high level of return on investment do renters seem to have a net energy advantage, presumably due to these tenants living in relatively new and efficient urban rentals. Tenure matters for more than just equity itself: renters are less likely to be able to take actions to improve their net energy returns due to a lack of property rights to do so as well as misaligned incentives (the principle-agent issue). Even when action is taken to improve the energy efficiency of a rental building, tenants are less likely to see any economic benefits from it.
 
 Households with solar as a primary heating fuel have a higher net energy income ratio than those with other fuel sources, except for households far below the energy poverty line. Why are solar households not receiving the same benefits of their fuel source across the distribution of incomes? This could be due to the low consumption of lower-income households meaning that the potential savings from installing a renewable energy system are lower than for high-income households.
+
+Assessing the Net Energy Return metric among different states in Figure \@ref(fig:state-violin) presents a counterintuitive picture of how states are addressing energy poverty and energy equity. 
+
+At first, there my not seem to be common threads among the top performers (CO, CA, HI, DC, WA) or bottom cohort (ME, MS, AL, VT, CT, RI). However, the nature of the metric is that it can equate communities that experience high energy costs and low incomes with those which have high incomes and even higher energy costs. This explains why states such as Connecticut and Vermont, where higher than average electricity prices may pose affordability threats for communities affected by higher prices, are similarly positioned on the list to states such as Missisipi and Alabama which have significant low income populations. Not only are households falling behind in terms of income, but energy represents a greater share of household expenditures than neighboring states and other parts of the country. This may be appropriate: while the equity issues in Southeastern states are well studied, states such as ME that continue to utilize residential heating energy sources like as oil and fuelwood will suffer not only from lack of efficiency but health impacts. From an affordability perspective states may need to pay attention to these metrics.
+
+Although they are the states with the highest NER, California and Colorado are not immune to these problems and likely represent a greater spread and diversity of energy affordability impacts. Likely, this diversity captures the benefits accrued by early adoptors and the challenges of having high populations of those struggling with energy poverty and high housing costs. In many of these places, residents have self-sorted into geographic areas based on the overall costs of living. Also, advances in clean energy legislation in states such as CA, CO, HI, DC, WA are a common thread, signaling the value of strong decarbonization targets and accompanying policies to ensure electricity affordability for low-income households.
 
 ## Equity
 
@@ -795,17 +809,17 @@ s1
 # Compare maps of energy burden vs. solar rooftop potential
 ```
 
-From an equity perspective, the Gini coefficient of net energy returns among U.S. households is [X]. This means that the net energy returns are distributed [Y] by household compared to a uniform distribution. Even this perspective is limited given that we would expect the productivity of energy usage by each household would be similar, even if the absolute values of energy consumption vary. In other words: there is no reason that net energy returns should differ among households at all.
+```{r eval=FALSE}
+From an equity perspective, the Gini coefficient of net energy returns among U.S. households is `r print("X")`. This means that the net energy returns are distributed `r print("Y")` by household compared to a uniform distribution. Even this perspective is limited given that we would expect the productivity of energy usage by each household would be similar, even if the absolute values of energy consumption vary. In other words: there is no reason that net energy returns should differ among households at all.
+```
 
 Net energy returns are different among different groups of households in America. These striking disparities suggest the existence of deeply structural barriers to prosperity in American society, ones which may not be alleviated and may even be exacerbated by electrification and the transition to clean fuels. How can our energy system be operated and improved to provide equitable access? Are there ways that clean electrification can be used to better benefit currently underserved communities?
 
 A sensible prior hypothesis is that everyone experiences the same efficiency from the energy system as measured by return on energy investment. The marginal unit of energy consumed by one household should lead to as much benefit for that household as any other. Differences in absolute outcomes may be related to the quantity of energy investment. However, here we see that system efficiency is different for different households on a relative basis. This difference is often correlated to factors that are out of the households’ control and even those related to persistent social inequalities.
 
-Energy is central to equity and economic prosperity, but the odds are stacked against many people. The energy system appears to be regressive in that costs accrue disproportionately to those of lower-income levels and the most energy-efficient homes belong to wealthier families. As a result, there has been a disparity in how the benefits of the energy transition are accruing among socioeconomic groups [@vaishnavWasItWorthwhile2017], and there is the potential for further division if appropriate policies are not implemented[@cullenwardDynamicallyEstimatingDistributional2016]. This does not have to be the case. A more comprehensive approach to poverty alleviation in the U.S. would also consider the energy situation of each household and the options available to improve its efficiency. Then, it would make those options accessible to the stakeholders who could benefit. 
+Energy is central to equity and economic prosperity, but the odds are stacked against many people. The energy system appears to be regressive in that costs accrue disproportionately to those of lower-income levels and the most energy-efficient homes belong to wealthier families. As a result, there has been a disparity in how the benefits of the energy transition are accruing among socioeconomic groups [@vaishnavWasItWorthwhile2017], and there is the potential for further division if appropriate policies are not implemented[@cullenwardDynamicallyEstimatingDistributional2016]. Typically, households using solar are higher income groups that have access to upfront capital to install solar and therefore have higher NER as a result. This creates a disparity between those with access to renewable energy and those reliant on fossil-fuel based energy sources. This does not have to be the case. A more comprehensive approach to poverty alleviation in the U.S. would also consider the energy situation of each household and the options available to improve its efficiency. Then, it would make those options accessible to the stakeholders who could benefit.
 
 Instead, a negative feedback loop results: oil/diesel/wood burning is a significant source of air pollution and exacerbates other household costs like healthcare and maintenance. High energy burdens have already been linked to air pollution (grid-wide and locally), and we can connect these directly to the full scope of household prosperity via net energy. Energy is essential to deal with other inequities in society. There must be a way to design a structure that addresses this disparity in a more equitable way. Solar could work and has outcompeted fossil fuels but is not accessible to Low-to-Moderate-Income (LMI) or even Middle-to-High-Income (MHI) segments due to structural issues. Low-interest loan programs, cooperative asset ownership, and a more in-depth examination of the energy system’s underlying regulatory structures could provide paths forward. This metric offers a way to track how the benefits of the energy transition are being accrued.
-
-## Laboratories of democracy
 
 ```{r}
 group_columns <- c("state_abbr")
@@ -827,50 +841,7 @@ y <- make_violin_chart(graph_data=graph_data,
 print(y)
 ```
 
-"a single courageous State may, if its citizens choose, serve as a laboratory; and try novel social and economic experiments without risk to the rest of the country" - U.S. Supreme Court Justice Louis Brandeis
-
-https://en.wikipedia.org/wiki/Laboratories_of_democracy#:~:text=Laboratories%20of%20democracy%20is%20a,in%20New%20State%20Ice%20Co.&text=Because%20there%20are%2050%20semi,directly%20affecting%20the%20entire%20country.
-
-What are the unique and common threads across CO, CA, HI, DC, WA?
-
-How about ME, MS, AL, VT, CT, RI?
-
-Also, how about states such as Connecticut where higher than average electricity prices may pose affordability threats for communities affected by higher prices. But, states such as ME that continue to utilize residential heating energy sources such as oil and fuelwood will suffer not only from lack of efficiency but health impacts.
-
-Poverty rates in AL and MS permeate through the electricity sector. Not only are households falling behind in terms of income, but energy represents a greater share of household expenditures than neighboring states and other parts of the country.
-
-CA and CO are not immune to these problems, but likely represent a greater spread and diversity of energy affordability impacts. Also, advances in clean energy legislation in states such as CA, CO, HI, DC, WA are a common thread, signaling the value of strong decarbonization targets and accompanying policies to ensure electricity affordability for low-income households.
-
-## Beyond balkanized
-
-[Insert depiction of net energy return variation among grids]
-```{r eval=FALSE}
-group_columns <- c("company_na")
-# utility type? see chartbook
-graph_data <- filter_graph_data(clean_data=clean_data_ami, 
-                                group_columns=group_columns, 
-                                metric_name=metric_name)
-```
-
-
-```{r eval=FALSE, fig.cap="A comparison of net energy returns across the United States (this chart continues to have issues regarding the spacing of the y-axis, which are in the roadmap to address prior to submission)."}
-# [This figure especially is a work in progress]
-
-# violin plot
-y <- make_violin_chart(graph_data=graph_data,
-                      group_columns=group_columns,
-                      metric_name=metric_name,
-                      metric_cutoff_level=metric_cutoff_level)
-print(y)
-```
-
-“To call the U.S. grid balkanized would insult the Macedonians.” - Marc L. Spitzer, former member of the Federal Energy Regulatory Commission
-
-https://www.nytimes.com/2013/07/13/us/ideas-to-bolster-power-grid-run-up-against-the-systems-many-owners.html
-
-Given the distinction between affordability and cost of supply as outlined in Pachauris et al., we should spend time focusing on how this metric varies among suppliers.
-
-Secondary energy is unique among these residential consumption categories because a single service provider is usually the authority for determining the costs of energy for each of its customers. In vertically integrated energy markets the monopoly utility is the only option available to all consumers. In restructured energy markets, the public utility is designated as the last resort provider for those unable or unwilling to participate in the competitive procurement of energy. In some markets, specialized rates or programs are available for Low and Moderate Income (LMI) consumers, who may have higher energy burdens. We find it notable that more than half of all funding to address high energy burdens in the U.S. is from utility ratepayer-funded bill and energy efficiency assistance [@rossHighCostEnergy2018]. 
+Given the distinction between affordability and cost of supply as outlined in Pachauris et al.[@pachauriAdvancingEnergyPoverty2020], more focus should be applied toward how energy poverty metrics vary among energy suppliers. Secondary energy is unique among these residential consumption categories because a single service provider is usually the authority for determining the costs of energy for each of its customers. In vertically integrated energy markets the monopoly utility is the only option available to all consumers. In restructured energy markets, the public utility is designated as the last resort provider for those unable or unwilling to participate in the competitive procurement of energy. In some markets, specialized rates or programs are available for Low and Moderate Income (LMI) consumers, who may have higher energy burdens. We find it notable that more than half of all funding to address high energy burdens in the U.S. is from utility ratepayer-funded bill and energy efficiency assistance [@rossHighCostEnergy2018].
 
 In addition to these relatively local measures, the Low Income Home Energy Assistance Program (LIHEAP) and the Weatherization Assistance Program (WAP) seek to address aspects of energy poverty through bill payment assistance and energy efficiency measures. The efficacy of these programs has been mixed in addressing distributional equity in energy burdens and receiving benefits from energy efficiency programs. The COVID-19 pandemic and associated economic downturn may be a critical opportunity to provide relief payments related to energy expenditures and to invest in more efficient residential and commercial energy infrastructure that enables newer and cleaner systems[@RecoveringFastSlow2020a][@chapmanImpactsCOVID19Transitioning2020]. U.S. households are already spending excessive amounts on energy-especially with more families staying at home for longer periods of time-so the ongoing crisis offers an chance to address the lack of infrastructure and employment opportunities with a focus on residential energy burdens[@graffCOVID19AssistanceNeeds2020a].
 
@@ -945,7 +916,7 @@ Link to final cleaned dataset in github.
 
 # Code Availability
 
-The code to fully reproduce this paper is available [here](https://github.com/emergi-foundation/leroi).
+The code to fully reproduce this paper is available [here](https://github.com/ericscheier/net_energy_equity).
 
 # References
 

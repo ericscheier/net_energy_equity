@@ -100,7 +100,7 @@ get_replica_supplemental_dataset <- function(col_types=NULL){
                            pad="0")
   
   
-  return(replica)
+  return(setDF(replica))
 }
 
 get_clean_replica <- function(replica=get_replica_dataset(),
