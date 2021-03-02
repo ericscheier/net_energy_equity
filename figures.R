@@ -29,7 +29,7 @@ grouped_weighted_metrics <- function(graph_data,
   weighted_metrics <- graph_data %>% 
     dplyr::filter(is.finite(!!sym(metric_name)), .preserve = TRUE) %>% 
     {if(!is.null(group_columns)) group_by_at(., .vars=vars(all_of(group_columns))) else .} %>% 
-    summarise(household_count = sum(households),
+    dplyr::summarise(household_count = sum(households),
               total_na = sum(is.na(!!sym(metric_name)) * households, na.rm = TRUE), 
               households_below_cutoff = 
                 sum((!!sym(metric_name) < metric_cutoff_level) * households, na.rm = TRUE), 
@@ -351,7 +351,9 @@ density_chart <- function(graph_data,
 make_violin_chart <- function(graph_data, 
                              group_columns, 
                              metric_name,
+                             metric_label,
                              metric_cutoff_level,
+                             fill_metric=NULL,
                              upper_quantile_view=1.0,
                              lower_quantile_view=0.0,
                              chart_title=NULL,
@@ -364,8 +366,8 @@ make_violin_chart <- function(graph_data,
                                   upper_quantile_view=upper_quantile_view, 
                                   lower_quantile_view=lower_quantile_view)
   
-  ylims <- c(min(max(0,gwm$metric_lower[is.finite(gwm$metric_lower)])),
-             max(boxplot.stats(graph_data[["ner"]])$stats))
+  ylims <- c(0,120)#c(min(max(0,gwm$metric_lower[is.finite(gwm$metric_lower)])),
+             # max(boxplot.stats(graph_data[[metric_name]])$stats))
   
   # if(is.null(group_columns)){
   #   sort_column<-"gisjoin"
@@ -388,6 +390,9 @@ make_violin_chart <- function(graph_data,
   #         paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")})
   # print(names(graph_data))
   # print(str(graph_data$group_name))
+  wm.summary <- function(y,w){
+    return(as.data.frame(y=weighted.median(y,w,na.rm=T)))
+  }
   
   y <- graph_data %>% #[graph_data$state_abbr=="VT",],
     # mutate(!!sym(group_variable) = fct_reorder(!!sym(group_variable), !!sym(metric_name), .fun='median')) %>%
@@ -398,33 +403,47 @@ make_violin_chart <- function(graph_data,
       # weight=sqrt(households),
       # varwidth = T,
       # weight="group_household_weights",
-      x = fct_reorder(group_name,
-        # if(is.null(group_columns)){sort_column}else{
-        #   #interaction(!!!sym(group_columns))
-        #   paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
-        # },
-                     !!sym(metric_name),
-                     .fun=median, na.rm=T, .desc=F), #!!sym(group_variable),#
-      y= !!sym(metric_name)#,
+      x = fct_reorder2(group_name,
+                       .x=!!sym(metric_name),
+                       .y=group_household_weights,
+                     .fun=weighted.median, .desc=F), #!!sym(group_variable),#
+      y= !!sym(metric_name),
+      weight = group_household_weights,
+      fill=if(is.null(fill_metric)){fill_metric}else{.data[[fill_metric]]}
       # group = if(is.null(group_columns)){group_columns}else{
       #   paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
       # }
       # group=vars(!!plot_group)
     ))+ 
-    # geom_point(stat = "identity") + 
+    # geom_point(stat = "weighted.median") +
     # geom_boxplot(inherit.aes = TRUE) + 
-    geom_boxplot(width=0.5,#position=position_dodge(width=50, preserve="single"),#stat="median",fun.args=c(na.rm=TRUE),
-                 notch=TRUE, color="gray", shape = 18, size = 0.5,
-                 outlier.shape = NA, na.rm=TRUE) + 
+    geom_boxplot(#aes_string(fill=fill_metric),
+                 width=0.5,#position=position_dodge(width=50, preserve="single"),#stat="median",fun.args=c(na.rm=TRUE),
+                 notch=FALSE,
+                 # color="gray",
+                 shape = 18,
+                 size = 0.5,
+                 outlier.shape = NA,
+                 coef=.25,
+                 na.rm=TRUE) +
     scale_x_discrete(expand=expansion(mult=c(0.01,0.01))) + 
     # scale_x_discrete(scale_x_discrete(guide = guide_axis(n.dodge=2))) + 
-    # geom_violin(trim=FALSE, alpha=0.3, outlier.shape=NA, color="gray",position=position_dodge(.5)) + 
+    # geom_violin(trim=FALSE,
+    #             alpha=0.3,
+    #             outlier.shape=NA,
+    #             color="gray",
+    #             position=position_dodge(.5)) +
     scale_y_continuous(#labels = scales::dollar_format(accuracy=1),
-                       breaks=seq(from=0,to=100,by=10), 
+                       breaks=seq(from=0,to=120,by=10), 
                        # minor_breaks=seq(from=0,to=20,by=.25),
-                       name=metric_label) + 
-    stat_summary(fun=median,fun.args=c(na.rm=TRUE),
-                 geom = "point", shape = 18, size = 1) +
+                       name=paste0(str_to_upper(metric_name)," (",metric_label,")")) + 
+    # stat_summary(fun.y="weighted.median",
+    #              # fun.args = c(na.rm=TRUE),
+    #              # aes(weight=group_household_weights),
+    #              geom = "point",
+    #              # fill="blue",
+    #              shape = 18,
+    #              size = 1) +
     xlab(paste(group_columns,
                sep="_",
                collapse="+")) +
@@ -463,13 +482,15 @@ make_violin_chart <- function(graph_data,
     labs(
       title=chart_title,
       subtitle=chart_subtitle,
-      caption=if(is.null(group_columns)){
-        group_columns
-      } else {
-        paste0("By ",paste(group_columns,
-                           sep="_",
-                           collapse="+"))
-      }) + 
+      caption=NULL
+      #   if(is.null(group_columns)){
+      #   group_columns
+      # } else {
+      #   paste0("By ",paste(group_columns,
+      #                      sep="_",
+      #                      collapse="+"))
+      # }
+) + 
     
     # coord_cartesian(ylim=as.numeric(ylims)*1.05)
     coord_flip(ylim = as.numeric(ylims))
@@ -678,6 +699,7 @@ make_all_charts <- function(clean_data,
     violin_chart <- make_violin_chart(graph_data, 
                                       group_columns, 
                                       metric_name,
+                                      metric_label,
                                       metric_cutoff_level,
                                       upper_quantile_view,
                                       lower_quantile_view,
