@@ -1,124 +1,3 @@
-filter_graph_data <- function(clean_data, group_columns, metric_name){
-  graph_data <- clean_data %>% 
-    {if(!is.null(group_columns)) group_by_at(., .vars=vars(all_of(group_columns))) else .} %>% 
-    mutate(group_households = sum(households)) %>% 
-    mutate(group_household_weights = ifelse(group_households==0,0,households/group_households)) %>% 
-    arrange(!!sym(metric_name)) %>% 
-    mutate(group_percentile = cumsum(households * group_household_weights),
-           overall_percentile = cumsum(households)/sum(households)#,
-    ) %>% 
-    # group_map( ~ .x %>% 
-    #              mutate(group_name =  paste(.y, collapse="+")), keep=TRUE) %>% 
-    {if(!is.null(group_columns)) 
-      unite(., "group_name", all_of(group_columns), remove=FALSE, sep="+", na.rm=FALSE) else 
-        (mutate(., group_name="all"))} %>% 
-    ungroup()
-  return(graph_data)
-}
-
-grouped_weighted_metrics <- function(graph_data, 
-                                     group_columns, 
-                                     metric_name, 
-                                     metric_cutoff_level, 
-                                     upper_quantile_view=1.0, 
-                                     lower_quantile_view=0.0){
-  # grouped_weighted_medians <- graph_data %>% 
-  #    group_by_at(.vars=vars(all_of(group_columns))) %>% 
-  #    summarise(metric_median = if( sum(!is.na(households))<3 ){NA} else { weighted.median(!!sym(metric_name), households, na.rm=TRUE)})
-  
-  weighted_metrics <- graph_data %>% 
-    dplyr::filter(is.finite(!!sym(metric_name)), .preserve = TRUE) %>% 
-    {if(!is.null(group_columns)) group_by_at(., .vars=vars(all_of(group_columns))) else .} %>% 
-    dplyr::summarise(household_count = sum(households),
-              total_na = sum(is.na(!!sym(metric_name)) * households, na.rm = TRUE), 
-              households_below_cutoff = 
-                sum((!!sym(metric_name) < metric_cutoff_level) * households, na.rm = TRUE), 
-              metric_max = max(!!sym(metric_name), na.rm = TRUE),
-              metric_min = min(!!sym(metric_name), na.rm = TRUE),
-              metric_mean = if( sum(!is.na(households*!!sym(metric_name)))<3 || 
-                                all(households==0) ){NA}else{
-                                  weighted.mean(x=!!sym(metric_name), w=households, na.rm = TRUE) },
-              metric_median = if( sum(!is.na(households*!!sym(metric_name)))<3 || 
-                                  all(households==0) ){NA}else{
-                                    weighted.quantile(x=!!sym(metric_name), w=households, probs=c(.5), na.rm=TRUE)},
-              metric_upper = if( sum(!is.na(households*!!sym(metric_name)))<3 || 
-                                 all(households==0) ){NA}else{
-                                   weighted.quantile(x=!!sym(metric_name), w=households,
-                                                     probs=c(upper_quantile_view), na.rm=TRUE)},
-              metric_lower = if( sum(!is.na(households*!!sym(metric_name)))<3 || 
-                                 all(households==0) ){NA}else{
-                                   weighted.quantile(x=!!sym(metric_name), w=households,
-                                                     probs=c(lower_quantile_view), na.rm=TRUE)}) %>% 
-    mutate(households_pct = household_count/sum(household_count),
-           pct_in_group_below_cutoff = households_below_cutoff/household_count,
-           pct_total_below_cutoff = households_below_cutoff/sum(households_below_cutoff))
-  
-  # overall_weighted_metrics <- graph_data %>% ungroup() %>%
-  #   summarise(metric_median = if( sum(!is.na(households))<3 ){NA} else { weighted.quantile(x=!!sym(metric_name), w=households, probs=c(.5), na.rm=TRUE)},
-  #             metric_upper = if( sum(!is.na(households))<3 ){NA} else { weighted.quantile(x=!!sym(metric_name), w=households, 
-  #                                                                                           probs=c(upper_quantile_view), na.rm=TRUE)},
-  #             metric_lower = if( sum(!is.na(households))<3 ){NA} else { weighted.quantile(x=!!sym(metric_name), w=households, 
-  #                                                                                           probs=c(lower_quantile_view), na.rm=TRUE)}
-  #   )
-  
-  #  all_groups <- as.data.frame(matrix(rep("All",length(group_columns)),nrow=1))
-  #  names(all_groups) <- group_columns
-  #  overall_weighted_median <- as_tibble(cbind(all_groups, overall_weighted_median))
-  
-  #  weighted_quantiles <- bind_rows(grouped_weighted_medians,overall_weighted_median) %>% ungroup() %>% 
-  #    mutate_at(.vars=vars(all_of(group_columns)), .funs=as.factor)
-  
-  #  return(weighted_quantiles)
-  return(weighted_metrics)
-}
-
-calculate_weighted_metrics <- function(graph_data, 
-                                       group_columns, 
-                                       metric_name, 
-                                       metric_cutoff_level, 
-                                       upper_quantile_view, 
-                                       lower_quantile_view){
-  
-  weighted_metrics <- grouped_weighted_metrics(graph_data, 
-                                               group_columns=NULL, 
-                                               metric_name, 
-                                               metric_cutoff_level, 
-                                               upper_quantile_view, 
-                                               lower_quantile_view)
-  
-  if(!is.null(group_columns)){
-    all_groups <- as.data.frame(matrix(rep("All",length(group_columns)),nrow=1))
-    names(all_groups) <- group_columns
-    weighted_metrics <- as_tibble(cbind(all_groups, weighted_metrics))
-    
-    grouped_weighted_metrics <- grouped_weighted_metrics(graph_data, 
-                                                         group_columns=group_columns, 
-                                                         metric_name, 
-                                                         metric_cutoff_level, 
-                                                         upper_quantile_view, 
-                                                         lower_quantile_view) %>% 
-      ungroup() %>% 
-      mutate_at(.vars=vars(all_of(group_columns)), .funs=as.factor)
-    # print(sapply(c(grouped_weighted_metrics, weighted_metrics),function(x){str(x[group_columns])}))
-    weighted_metrics <- bind_rows(grouped_weighted_metrics,weighted_metrics) %>% ungroup() %>% 
-      mutate_at(.vars=vars(all_of(group_columns)), .funs=as.factor)
-    
-    
-  }else{
-    weighted_metrics <- data.frame(group=as.factor(rep("All", nrow(weighted_metrics))), weighted_metrics)
-  }
-  
-  return(weighted_metrics)
-}
-
-# weighted_metrics <- calculate_weighted_metrics(graph_data, 
-#                                          group_columns, 
-#                                          metric_name, 
-#                                          metric_cutoff_level, 
-#                                          upper_quantile_view, 
-#                                          lower_quantile_view)
-# weighted_metrics
-
 #' @rdname ggplot2-ggproto
 #' @format NULL
 #' @usage NULL
@@ -180,8 +59,9 @@ density_chart <- function(graph_data,
                           group_columns, 
                           metric_cutoff_level, 
                           metric_cutoff_label, 
-                          chart_title, 
-                          chart_subtitle,
+                          chart_title=NULL, 
+                          chart_subtitle=NULL,
+                          chart_caption=NULL,
                           x_label="Proportion of Households"){
   
   legend_title <- group_columns
@@ -338,7 +218,7 @@ density_chart <- function(graph_data,
     labs(
       title=chart_title,
       subtitle=chart_subtitle,
-      caption=NULL
+      caption=chart_caption
       ) + 
     coord_flip(xlim=c(0,120),
                ylim=c(0,1),
@@ -349,15 +229,20 @@ density_chart <- function(graph_data,
 
 
 make_violin_chart <- function(graph_data, 
-                             group_columns, 
+                             group_columns,
                              metric_name,
                              metric_label,
                              metric_cutoff_level,
                              fill_metric=NULL,
-                             upper_quantile_view=1.0,
-                             lower_quantile_view=0.0,
+                             fill_label=NULL,
+                             upper_quantile_view=.75,
+                             lower_quantile_view=.25,
+                             group_name=NULL,
                              chart_title=NULL,
-                             chart_subtitle=NULL){
+                             chart_subtitle=NULL,
+                             chart_caption=NULL,
+                             reverse_palette=FALSE,
+                             x_label=NULL){
   
   gwm <- grouped_weighted_metrics(graph_data=graph_data, 
                                   group_columns=group_columns, 
@@ -366,8 +251,14 @@ make_violin_chart <- function(graph_data,
                                   upper_quantile_view=upper_quantile_view, 
                                   lower_quantile_view=lower_quantile_view)
   
-  ylims <- c(0,120)#c(min(max(0,gwm$metric_lower[is.finite(gwm$metric_lower)])),
-             # max(boxplot.stats(graph_data[[metric_name]])$stats))
+  ylims <- c(.95*min(gwm$metric_lower[is.finite(gwm$metric_lower)]),
+             1.05*max(gwm$metric_upper[is.finite(gwm$metric_upper)]))
+  
+  if(is.null(x_label)){
+    x_label <- paste0(str_to_upper(metric_name)," (",metric_label,")")
+  }
+  
+  # max(boxplot.stats(graph_data[[metric_name]])$stats))
   
   # if(is.null(group_columns)){
   #   sort_column<-"gisjoin"
@@ -393,6 +284,12 @@ make_violin_chart <- function(graph_data,
   wm.summary <- function(y,w){
     return(as.data.frame(y=weighted.median(y,w,na.rm=T)))
   }
+  
+  pal <- (wes_palette("Zissou1", 100, type = "continuous"))#STCYPR
+  if(reverse_palette){
+    pal <- rev(pal)
+  }
+
   
   y <- graph_data %>% #[graph_data$state_abbr=="VT",],
     # mutate(!!sym(group_variable) = fct_reorder(!!sym(group_variable), !!sym(metric_name), .fun='median')) %>%
@@ -420,13 +317,15 @@ make_violin_chart <- function(graph_data,
     geom_boxplot(#aes_string(fill=fill_metric),
                  width=0.5,#position=position_dodge(width=50, preserve="single"),#stat="median",fun.args=c(na.rm=TRUE),
                  notch=FALSE,
+                 alpha=0.9,
                  # color="gray",
                  shape = 18,
-                 size = 0.5,
+                 size = 0.25,
                  outlier.shape = NA,
-                 coef=.25,
+                 show.legend = TRUE,
+                 coef=0,
                  na.rm=TRUE) +
-    scale_x_discrete(expand=expansion(mult=c(0.01,0.01))) + 
+    scale_x_discrete(expand=expansion(mult=c(0.01,0.01)), name=group_name) + 
     # scale_x_discrete(scale_x_discrete(guide = guide_axis(n.dodge=2))) + 
     # geom_violin(trim=FALSE,
     #             alpha=0.3,
@@ -436,7 +335,24 @@ make_violin_chart <- function(graph_data,
     scale_y_continuous(#labels = scales::dollar_format(accuracy=1),
                        breaks=seq(from=0,to=120,by=10), 
                        # minor_breaks=seq(from=0,to=20,by=.25),
-                       name=paste0(str_to_upper(metric_name)," (",metric_label,")")) + 
+                       name=x_label)
+  
+    if(!is.null(fill_metric)){
+      fill_limits <- c(
+        (floor((100*min(graph_data[[fill_metric]]))/5)*5)/100-0.0000001,
+        (ceiling((100*max(graph_data[[fill_metric]]))/5)*5)/100+0.0000001
+      )
+      
+      y <- y+scale_fill_gradientn(colours = pal,
+                         labels = scales::label_percent(accuracy = 1),
+                         n.breaks=4,
+                         limits=fill_limits,
+                         guide = guide_colorbar(direction="horizontal",
+                                                title.position = 'top',
+                                                title.hjust = .5,
+                                                frame.colour = "black",
+                                                ticks.colour = "black"),
+                         name=fill_label)}
     # stat_summary(fun.y="weighted.median",
     #              # fun.args = c(na.rm=TRUE),
     #              # aes(weight=group_household_weights),
@@ -444,11 +360,12 @@ make_violin_chart <- function(graph_data,
     #              # fill="blue",
     #              shape = 18,
     #              size = 1) +
-    xlab(paste(group_columns,
+    y <- y + xlab(paste(group_columns,
                sep="_",
                collapse="+")) +
     theme_minimal() + 
-    theme(legend.position="none",
+    theme(legend.position=c(0.65, 0.25),#"none",
+          legend.title.align=0.5,
           # legend.justification = c(1, 1), 
           # legend.position = c(0.25, 1), 
           # legend.title=element_blank(),
@@ -482,7 +399,7 @@ make_violin_chart <- function(graph_data,
     labs(
       title=chart_title,
       subtitle=chart_subtitle,
-      caption=NULL
+      caption=chart_caption
       #   if(is.null(group_columns)){
       #   group_columns
       # } else {
@@ -530,8 +447,8 @@ choropleth_map <- function(
   if(include_basemap){
     
     # https://stackoverflow.com/questions/52704695/is-ggmap-broken-basic-qmap-produces-arguments-imply-differing-number-of-rows
-    basemap_files <- get_stamenmap(bbox=b, 
-                                zoom=calc_zoom(b, adjust=as.integer(0)),
+    basemap_files <- ggmap::get_stamenmap(bbox=b, 
+                                zoom=ggmap::calc_zoom(b, adjust=as.integer(0)),
                                 maptype="toner-background")
     
     basemap_files <- ggmap_bbox(basemap_files)
@@ -667,8 +584,9 @@ make_all_charts <- function(clean_data,
                             metric_cutoff_label,
                             upper_quantile_view=1.0,
                             lower_quantile_view=0.0,
-                            chart_title,
-                            chart_subtitle,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            chart_caption=NULL,
                             x_label="Proportion of Households"){
   
   
@@ -691,6 +609,7 @@ make_all_charts <- function(clean_data,
                                  metric_cutoff_label, 
                                  chart_title, 
                                  chart_subtitle,
+                                 chart_caption,
                                  x_label=x_label)
   
   # if(length(group_columns)>1){
@@ -701,10 +620,14 @@ make_all_charts <- function(clean_data,
                                       metric_name,
                                       metric_label,
                                       metric_cutoff_level,
+                                      fill_metric=NULL,
+                                      fill_label=NULL,
                                       upper_quantile_view,
                                       lower_quantile_view,
+                                      group_name=NULL,
                                       chart_title,
                                       chart_subtitle)
+
   # }
   
   return(list("density"=density_chart,
