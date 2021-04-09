@@ -269,7 +269,7 @@ read_then_csv <- function(sheet, path) {
     tools::file_path_sans_ext()
   path %>%
     read_excel(sheet = sheet, col_names = FALSE, col_types = "text") %>% 
-    write_csv(paste0(sheet, ".csv"))
+    write_csv(paste0("data/",sheet, ".csv"))
 }
 
 raw_to_lead <- function(data, acs_version){
