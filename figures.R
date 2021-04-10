@@ -55,14 +55,20 @@ stat_ewcdf <- function(mapping = NULL, data = NULL,
 
 density_chart <- function(graph_data, 
                           metric_name, 
-                          metric_label,
+                          metric_label=NULL,
                           group_columns, 
                           metric_cutoff_level, 
-                          metric_cutoff_label, 
+                          metric_cutoff_label,
+                          upper_quantile_view=1,
+                          lower_quantile_view=0,
                           chart_title=NULL, 
                           chart_subtitle=NULL,
                           chart_caption=NULL,
                           x_label="Proportion of Households"){
+  
+  if(is.null(metric_label)){
+    metric_label <- toupper(metric_name)
+  }
   
   legend_title <- group_columns
   if(!is.null(legend_title)){
@@ -516,8 +522,7 @@ choropleth_map <- function(
       name=guide_name) +
     labs(
       title = chart_title,
-      subtitle = chart_subtitle#,
-      # caption = "Data: NREL" # | Creation: Eric Scheier | emergi.eco"
+      subtitle = chart_subtitle
     ) +
     theme(
       legend.position = c(0.20, 0.15)
@@ -579,7 +584,7 @@ choropleth_map <- function(
 make_all_charts <- function(clean_data,
                             group_columns,
                             metric_name,
-                            metric_label, 
+                            metric_label=NULL, 
                             metric_cutoff_level,
                             metric_cutoff_label,
                             upper_quantile_view=1.0,
@@ -596,8 +601,8 @@ make_all_charts <- function(clean_data,
                                                  group_columns, 
                                                  metric_name, 
                                                  metric_cutoff_level, 
-                                                 upper_quantile_view=1.0, 
-                                                 lower_quantile_view=0.0)
+                                                 upper_quantile_view, 
+                                                 lower_quantile_view)
   
   
     
@@ -607,6 +612,8 @@ make_all_charts <- function(clean_data,
                                  group_columns, 
                                  metric_cutoff_level, 
                                  metric_cutoff_label, 
+                                 upper_quantile_view,
+                                 lower_quantile_view,
                                  chart_title, 
                                  chart_subtitle,
                                  chart_caption,
@@ -630,7 +637,8 @@ make_all_charts <- function(clean_data,
 
   # }
   
-  return(list("density"=density_chart,
+  return(list("metrics"=weighted_metrics,
+              "density"=density_chart,
               # "choropleth"=choropleth_chart,
               "violin"=violin_chart))
 }
