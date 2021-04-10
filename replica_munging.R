@@ -209,9 +209,8 @@ lead_to_replica <- function(clean_lead=NULL){
   print("consolidating housing_tenure")
   clean_lead$replica_housing_tenure <- dplyr::recode_factor(clean_lead$housing_tenure, 
                                                      `OWNER` = "owned", 
-                                                     `RENTER` = "rented")#,
-  # .default = "D", 
-  # .missing = "M")
+                                                     `RENTER` = "rented")
+  
   print("consolidating income_bracket")
   clean_lead$merge_income_bracket <- dplyr::recode_factor(clean_lead$income_bracket,
                                                    `0-30%` = "very_low",
