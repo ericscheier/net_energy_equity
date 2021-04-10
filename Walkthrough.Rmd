@@ -1,0 +1,458 @@
+---
+title: "Walkthrough"
+author: "Eric Scheier"
+date: "4/9/2021"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+is_final=FALSE
+is_preview=FALSE#
+is_draft=TRUE
+set.seed(123)
+
+knitr::opts_chunk$set(comment='##', 
+                      collapse=ifelse(is_preview,TRUE,!is_draft),
+                      echo=ifelse(is_preview,FALSE,is_draft),
+                      eval=TRUE,
+                      warning=ifelse(is_preview,FALSE,is_draft),
+                      error=ifelse(is_preview,FALSE,is_draft),
+                      results=ifelse(is_final,'hide',ifelse(is_preview,'hide','markup')),
+                      fig.keep='all',
+                      message=ifelse(is_preview,FALSE,is_draft),
+                      include=ifelse(is_preview,TRUE,is_draft),
+                      tidy=TRUE,
+                      cache=FALSE,
+                      fig.margin=FALSE,
+                      fig.fullwidth = TRUE
+                      )
+```
+
+All of the libraries and functions needed to download and munge the data and create the paper and figures are located in `sources.R`, so we must source this file first.
+
+```{r sources}
+source("sources.R")
+```
+
+We only need to define a few parameters to get things in motion:
+
++ `states`: which states we want to asses. In addition to defining a single state (e.g. `"nc"`), note that we can define multiple states (`c("nc","sc")`) or `"all"` states.
++ `refresh`: whether we want to gather the data fresh regardless of whether we already have some downloaded. This is especially useful in development, but in most cases you want `refresh=FALSE` to avoid recreating data you have already downloaded and munged.
++ `acs_version`: which end-year of the five year American Community Survey to pull data from. At the moment, only `2016` and `2018` are available.
++ `geographic_scope`: which geography to pull the data for. Note that while states, cities, and counties are also available for analysis, we only work with the census tract level for now.
+
+```{r parameters}
+states <- "nc" #c("ca","nc","sc") #"all"
+refresh <- FALSE
+acs_version <- 2018
+geographic_scope <- "census tracts" #statecitycounty
+```
+
+With those methods defined we can perform the methods to support the paper. This function is the only logic contained in `methods.R`. If you already have data in a `/data` directory, you will want to make sure that the parent directory of `/data` is your working directory before running this function. If you have no `/data` directory, the `paper_methods()` function will create one and populate it accordingly.
+
+The data used in this paper is available in 3 formats related to how the income brackets are framed. These are portrayed relative to:
+
++ The Federal Poverty Line (FPL)
++ Area Median Income (AMI)
++ State Median Income (SMI) [only available for 2018 ACS data]
+
+This paper utilizes the framing relative to the Federal Poverty Level and that relative to Area Median Income, so the methods will run a loop to process each of these datasets.
+
+```{r run-methods, cache=FALSE}
+paper_methods(states=states,
+              acs_version=acs_version,
+              refresh=refresh)
+```
+
+The full `paper_methods()` function can be found in `methods.R`, but to explain in more detail how this method works before moving on:
+
+
+The methods rely heavily on the `get_multiple_states()` function and it, in turn, relies heavily on the `get_lead_dataset()` function. These are found in `lead_munging.R`, and the behavior of the `get_lead_dataset()` is portrayed below. `get_multiple_states()` is basically a wrapper around this function to enter the correct parameters based on the year of data being called upon, and loop over multiple states as needed. There are a few potential data munging steps that can be performed depending on how clean and in which format the data is desired, whether raw or to be merged with the REPLICA dataset. For demonstration, we will start by getting the raw dataset for a single state. Note that these can be rather large files and the function will download what it needs if it is not already in your `data/` directory.
+
+```{r get-raw-lead-data}
+raw_lead_data <- get_lead_dataset(state=states[1],
+                             income_metric="AMI", #AMI FPL SMI
+                             resource_id=NULL,
+                             geographic_scope="Census Tracts",#"Census Tracts","State, Counties, Cities"
+                             all_resources=NULL,
+                             refresh=FALSE,
+                             load=TRUE,
+                             save_format="raw",
+                             load_format="raw",
+                             save_ext="csv",
+                             save=FALSE,
+                             acs_version=2018#"2016",
+                             )
+head(raw_lead_data)
+```
+
+Through the `raw_to_lead()` function, this data is munged into a slightly nicer looking format:
+
+```{r clean-lead-data}
+clean_lead_data <- raw_to_lead(raw_lead_data, acs_version = acs_version)
+head(clean_lead_data)
+```
+
+And from here, we can convert this into the more aggregated format of the REPLICA dataset using `lead_to_replica()` found in `replica_munging.R`. The REPLICA format is useful because it simplifies the cohorts into fewer income brackets, fewer unit denominations, and dispenses with categories such as the age of the building and primary heating fuel. This does dispense with some categories as well, such as boats/RVs/vans and mobile trailers.
+
+
+```{r replica-lead-data}
+replica_lead_data <- lead_to_replica(clean_lead_data)
+head(replica_lead_data)
+```
+
+This clean format is now more approachable than the raw LEAD format and can be merged with the REPLICA dataset to bring in technical data about rooftop solar potential for each cohort. Note that when generating clean datasets for analysis, we do not have to aggregate to the relatively extreme degree of the REPLICA dataset as we have with the AMI-denominated cohorts above. In fact, when treating the FPL dataset for analysis we leave the primary fuel type disaggregated while simplifying the remaining cohort characteristics.
+
+Finally, we can calculate the relevant statistics for each cohort using basic arithmetic. The `energy_cost` is calculated in the methods function as `rowSum`s of `electricity_spend`, `gas_spend`, and `other_spend`. `s=energy_cost` and `g=income` are then used to calculate whichever metric is of interest as defined in `ratios.R`.
+
+Ratios can be calculated using units of energy (`se`), if available, or as unitless ratios of income and expenditures. Only the latter is used in the current paper.
+
+```{r}
+energy_burden_func
+```
+
+
+```{r}
+ner_func
+```
+
+This provides the final format of the data for use in the paper.
+
+Now that we have run the methods and explained a bit about how they work at each major step of munging, we can load the clean datasets that have been generated. These are loaded as the following objects with the following meanings:
+
++ `clean_data_ami`: munged data with income brackets framed in terms of Area Median Income (AMI). Cohorts are defined by Income Bracket, Number of Units, and Housing Tenure for each census tract.
++ `clean_data_fpl`: munged data with income brackets framed in terms of the Federal Poverty Line (FPL). Cohorts are defined by Income Bracket, Primary Heating Fuel, Number of Units, and Housing Tenure for each census tract.
++ `replica_sup`: supplemental demographic and technical potential data for each census tract as aggregated by NREL for 2018.
++ `census_tracts_shp`: shapefiles for all the census tracts.
+
+```{r load-data}
+income_metric <- "AMI" #"AMI" #"fpl15" #
+
+version_text <- as.character(acs_version)
+if(acs_version==2016){
+  version_text <- "sh"
+}
+
+base_file_name <- tolower(paste(income_metric,
+                                geographic_scope,
+                                version_text,
+                                paste(states,collapse="_",sep=""), sep = "_"))
+
+clean_data_ami <- read_csv(paste0("data/very_clean_data_",base_file_name,".csv"), guess_max = 10^6)
+clean_data_ami$geo_id <- str_pad(as.character(clean_data_ami$geo_id), width=11, side="left", pad="0")
+
+income_metric <- "FPL"
+base_file_name <- tolower(paste(income_metric,
+                                geographic_scope,
+                                version_text,
+                                paste(states,collapse="_",sep=""), sep = "_"))
+clean_data_fpl <- read_csv(paste0("data/very_clean_data_",base_file_name,".csv"), guess_max = 10^6)
+clean_data_fpl$geo_id <- str_pad(as.character(clean_data_fpl$geo_id), width=11, side="left", pad="0")
+
+replica_sup <- get_replica_supplemental_dataset()
+census_tracts_shp <- st_read("data/all_census_tracts.geojson")
+```
+
+Let's look at the `clean_data_ami` dataset, which reflect the steps we outlined above along with cleaning up the names.
+
+```{r}
+head(clean_data_ami)
+```
+
+To produce the density charts shown in the paper, we need to define which metric we want to view them in terms of (in this case: NER) and where to draw the energy poverty line.
+
+```{r}
+metric_name<-"ner"
+metric_cutoff_level=9
+```
+
+Then, we preprocess the data using the `filter_graph_data()` (found in `helpers.R`) function to determine how many households are in each group that we want to portray and calculate how much weight each cohort should receive in the density graph. For the entire dataset, the group can be defined as `NULL`.
+
+```{r cache=FALSE}
+graph_data <- filter_graph_data(clean_data_ami, group_columns=NULL, metric_name="ner")
+head(graph_data)
+```
+
+```{r}
+head(graph_data[,c("households",
+                   "group_households",
+                   "group_household_weights",
+                   "group_percentile",
+                   "overall_percentile",
+                   "group_name")])
+```
+
+We can then chart this data.
+
+```{r cache=FALSE}
+p1 <-   density_chart(graph_data=graph_data,
+                      group_columns=NULL,
+                       metric_name=metric_name,
+                       metric_cutoff_level=metric_cutoff_level, 
+                       metric_cutoff_label="Energy Poverty Line")
+p1
+```
+
+To display groups, we simply define a non-null group variable.
+
+```{r}
+top_line_group <- "income_bracket"
+graph_data <- filter_graph_data(clean_data_fpl,
+                                group_columns=top_line_group,
+                                metric_name=metric_name)
+
+p2 <- density_chart(graph_data=graph_data, 
+                               metric_name=metric_name, 
+                               group_columns=top_line_group, 
+                               metric_cutoff_level=metric_cutoff_level, 
+                               metric_cutoff_label="Energy Poverty Line")
+p2
+```
+
+
+We also can use the function `calculate_weighted_metrics()` (found in `helpers.R`) to show some statistics by group. The `metric_upper` and `metric_lower` stats are defined by the `upper_quantile_view` and `lower_quantile_view` paramters respectively.
+
+```{r}
+weighted_metrics <- calculate_weighted_metrics(graph_data=graph_data, 
+                                               group_columns=top_line_group, 
+                                               metric_name=metric_name, 
+                                               metric_cutoff_level=metric_cutoff_level, 
+                                               upper_quantile_view=0.25, 
+                                               lower_quantile_view=0.75)
+weighted_metrics
+```
+
+To define a group by more than one variable, simply use a vector of variable names. The `make_all_charts()` function performs the preprocessing using `filter_graph_data()` and calculates the summary statistics along with the potential for other graphs to be added.
+
+```{r cache=FALSE}
+top_line_group <- c("number_of_units", "housing_tenure")
+
+top_line_charts <- make_all_charts(clean_data_ami,
+                            group_columns=top_line_group,
+                            metric_name=metric_name,
+                            metric_cutoff_level=metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            upper_quantile_view=0.75,
+                            lower_quantile_view=0.25)
+p4=top_line_charts[["density"]]
+p4
+```
+
+```{r}
+top_line_charts[["metrics"]]
+```
+
+
+Finally, we will show how the choropleths are made. First, let's calculate some demographic statistics based on the supplemental data that is provided from the REPLICA dataset:
+
+```{r}
+replica_sup$pct_african_american <- replica_sup$pop_african_american / replica_sup$pop_total
+
+replica_sup$households <- (replica_sup$hu_own + replica_sup$hu_rent)
+
+replica_sup$income_per_capita <- (replica_sup$hh_med_income * replica_sup$households) / replica_sup$pop_total
+
+replica_sup$unemployment_rate <- replica_sup$p16_unempl / (replica_sup$p16_unempl + replica_sup$p16_employ)
+```
+
+Then, we join this demographic data to the census tract shapefiles:
+
+```{r join_data}
+tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
+```
+
+And then we redefine some variables that have been used in the charts above so far.
+
+```{r chart_params}
+#chart_title <- "Household Economic Return on Energy Spending"
+chart_title <- "Median Net Energy Return"
+chart_subtitle <- "Per Census Tract"
+
+group_columns <- NULL #"income_bracket")#in_poverty
+                   #"primary_heating_fuel"
+
+metric_name <- "ner" #"energy_burden" #"ner" #"dear" #"eroi"
+metric_label <- "$/$"
+metric_cutoff_level <- 9
+metric_cutoff_label <- "9"
+
+upper_quantile_view <- 1.0
+lower_quantile_view <- 0.0
+```
+
+
+To calculate the median NER per census tract, we use the `grouped_weighted_metrics()` function (found in `helpers.R`) and group by `geo_id`. The only difference between `grouped_weighted_metrics()` and `calculate_weighted_metrics()` is that the latter adds an `all` group to summarize the entire dataset, which we do not want for this purpose.
+
+```{r grouped_weighted_metrics}
+#data$GEOID <- sub('.', '', data$gisjoin)
+group_columns <- c("geo_id") #c("gisjoin") #
+graph_data <- filter_graph_data(clean_data_ami, group_columns, metric_name)
+
+gwm <- grouped_weighted_metrics(graph_data, 
+                         group_columns, 
+                         metric_name, 
+                         metric_cutoff_level, 
+                         upper_quantile_view=0.75, 
+                         lower_quantile_view=0.25)
+head(gwm)
+```
+
+For simplicity we just want to display the data for the state(s) we selected, so we filter our shapefiles to that area:
+
+```{r select_area}
+selection_shp <- tract_shp %>% dplyr::filter(state_abbr %in% toupper(states))
+
+map_data <- left_join(selection_shp, gwm, by=c("geoid"="geo_id"))
+```
+
+We calculate the extent of the color scale for the choropleth using the grouped weighted metrics, for now.
+
+```{r scale_extents}
+clean_top_metrics <- grouped_weighted_metrics(graph_data, 
+                         group_columns=NULL, 
+                         metric_name=metric_name, 
+                         metric_cutoff_level=metric_cutoff_level, 
+                         upper_quantile_view=1, 
+                         lower_quantile_view=0)
+```
+
+
+```{r continental_map, out.width="100%", fig.cap="Map of the median net earned income per secondary energy expenditure for each census tract in the continental United States."}
+# figure_name <- "choropleth_map"
+# figure_file <- paste0("figures/",figure_name,".png")
+# if(!file.exists(figure_file) || refresh){
+choropleth_chart <- choropleth_map(
+    clean_data=map_data,
+    group_columns,
+    metric_name,
+    metric_label,
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view,
+    lower_quantile_view,
+    chart_title,
+    chart_subtitle,
+    weighted_metrics=clean_top_metrics,
+    include_basemap=FALSE)
+  # ggsave(figure_file, plot=choropleth_chart)
+# }
+choropleth_chart
+```
+
+We can also display some of the demographic data calculated earlier in this fashion:
+
+```{r}
+#chart_title <- "Household Economic Return on Energy Spending"
+chart_title <- "Percent African American"
+chart_subtitle <- "Per Census Tract"
+
+group_columns <- c("geoid") #"income_bracket")#in_poverty
+                   #"primary_heating_fuel"
+
+metric_name <- "pct_african_american" #"energy_burden" #"ner" #"dear" #"eroi"
+metric_label <- "%"
+metric_cutoff_level <- median(selection_shp$pct_african_american, na.rm = T)
+metric_cutoff_label <- ""
+
+upper_quantile_view <- 1.0
+lower_quantile_view <- 0.0
+
+graph_data <- filter_graph_data(selection_shp, group_columns, metric_name)
+
+# gwm <- grouped_weighted_metrics(st_drop_geometry(graph_data),
+#                          group_columns,
+#                          metric_name,
+#                          metric_cutoff_level,
+#                          upper_quantile_view=1.0,#0.75,
+#                          lower_quantile_view=0.0)#0.25)
+
+gwm <- graph_data[,c("geoid", metric_name)]
+gwm <- rename(gwm, metric_median = !!sym(metric_name))
+
+map_data <- left_join(graph_data, st_drop_geometry(gwm), by=c("geoid"))
+
+clean_top_metrics <- grouped_weighted_metrics(replica_sup %>% 
+                                                filter(!(state_abbr %in% c("HI","AK", NA))),
+                                              group_columns=NULL,
+                                              metric_name,
+                                              metric_cutoff_level,
+                                              upper_quantile_view=1.0,
+                                              lower_quantile_view=0.0)
+
+choropleth_chart <- choropleth_map(
+    clean_data=map_data,
+    group_columns,
+    metric_name,
+    metric_label,
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view,
+    lower_quantile_view,
+    chart_title,
+    chart_subtitle,
+    weighted_metrics=clean_top_metrics,
+    include_basemap=FALSE)
+  # ggsave(figure_file, plot=choropleth_chart)
+# }
+choropleth_chart
+```
+```{r}
+#chart_title <- "Household Economic Return on Energy Spending"
+chart_title <- "Per Capita Income"
+chart_subtitle <- "Per Census Tract"
+
+group_columns <- c("geoid") #"income_bracket")#in_poverty
+                   #"primary_heating_fuel"
+
+metric_name <- "income_per_capita" #"energy_burden" #"ner" #"dear" #"eroi"
+metric_label <- "$"
+metric_cutoff_level <- median(selection_shp$income_per_capita, na.rm = T)
+metric_cutoff_label <- ""
+
+upper_quantile_view <- 1.0
+lower_quantile_view <- 0.0
+
+graph_data <- filter_graph_data(selection_shp, group_columns, metric_name)
+
+# gwm <- grouped_weighted_metrics(graph_data,
+#                          group_columns,
+#                          metric_name,
+#                          metric_cutoff_level,
+#                          upper_quantile_view=1.0,#0.75,
+#                          lower_quantile_view=0.0)#0.25)
+
+gwm <- graph_data[,c("geoid", metric_name)]
+gwm <- rename(gwm, metric_median = !!sym(metric_name))
+
+map_data <- left_join(graph_data, st_drop_geometry(gwm), by=c("geoid"))
+
+clean_top_metrics <- grouped_weighted_metrics(replica_sup %>% 
+                                                filter(!(state_abbr %in% c("HI","AK", NA))),
+                                              group_columns=NULL,
+                                              metric_name,
+                                              metric_cutoff_level,
+                                              upper_quantile_view=1.0,
+                                              lower_quantile_view=0.0)
+
+choropleth_chart <- choropleth_map(
+    clean_data=map_data,
+    group_columns,
+    metric_name,
+    metric_label,
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view,
+    lower_quantile_view,
+    chart_title,
+    chart_subtitle,
+    weighted_metrics=clean_top_metrics,
+    include_basemap=FALSE)
+  # ggsave(figure_file, plot=choropleth_chart)
+# }
+choropleth_chart
+```
+
+
