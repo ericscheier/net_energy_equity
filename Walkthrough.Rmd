@@ -1,16 +1,16 @@
 ---
 title: "Walkthrough"
 author: "Eric Scheier"
-date: "4/9/2021"
+date: "`r format(Sys.time(), '%Y-%B-%d')`"
 output:
-  html_document: default
-  word_document: default
   pdf_document: default
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 is_final=FALSE
-is_preview=FALSE#
+is_preview=TRUE#
 is_draft=TRUE
 set.seed(123)
 
@@ -25,7 +25,7 @@ knitr::opts_chunk$set(comment='##',
                       message=ifelse(is_preview,FALSE,is_draft),
                       include=ifelse(is_preview,TRUE,is_draft),
                       tidy=TRUE,
-                      cache=FALSE,
+                      cache=TRUE,
                       fig.margin=FALSE,
                       fig.fullwidth = TRUE
                       )
@@ -59,7 +59,7 @@ The data used in this paper is available in 3 formats related to how the income 
 + Area Median Income (AMI)
 + State Median Income (SMI) [only available for 2018 ACS data]
 
-This paper utilizes the framing relative to the Federal Poverty Level and that relative to Area Median Income, so the methods will run a loop to process each of these datasets.
+This paper utilizes the framing relative to the Federal Poverty Level and that relative to Area Median Income, so the methods will run a loop to process each of these datasets. We also only utilize census tract data currently, so the `geographic_scope` parameter is not yet used in this function.
 
 ```{r run-methods, cache=FALSE}
 paper_methods(states=states,
@@ -74,9 +74,9 @@ The methods rely heavily on the `get_multiple_states()` function and it, in turn
 
 ```{r get-raw-lead-data}
 raw_lead_data <- get_lead_dataset(state=states[1],
-                             income_metric="AMI", #AMI FPL SMI
+                             income_metric="AMI",
                              resource_id=NULL,
-                             geographic_scope="Census Tracts",#"Census Tracts","State, Counties, Cities"
+                             geographic_scope="Census Tracts",
                              all_resources=NULL,
                              refresh=FALSE,
                              load=TRUE,
@@ -84,7 +84,7 @@ raw_lead_data <- get_lead_dataset(state=states[1],
                              load_format="raw",
                              save_ext="csv",
                              save=FALSE,
-                             acs_version=2018#"2016",
+                             acs_version=2018
                              )
 head(raw_lead_data)
 ```

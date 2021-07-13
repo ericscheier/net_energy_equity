@@ -93,9 +93,9 @@ density_chart <- function(graph_data,
   
   movie <- "Darjeeling1" #"GrandBudapest1"
   #pal <- wes_palette(name=movie, n=pal_n, type="continuous")
-  pal <- sample(x=wes_palette(name=movie, n=pal_n, type="continuous"), 
-                size = pal_n, 
-                replace = FALSE)
+  pal <- rev(sample(x=wes_palette(name=movie, n=pal_n, type="continuous"),
+                size = pal_n,
+                replace = FALSE))
   
   weighted_metrics <- calculate_weighted_metrics(graph_data, 
                                                  group_columns, 
@@ -129,9 +129,15 @@ density_chart <- function(graph_data,
                         # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
                       }
     )) + 
-    ggrastr::rasterise(stat_ewcdf(geom='line',  alpha=1, na.rm=T, show.legend = NA, size=0.1)) + 
-    ggrastr::rasterise(stat_ewcdf(aes(ymin=..y.., ymax=1), geom='ribbon', alpha=.1, 
-               na.rm=T, show.legend = NA)) + 
+    ggrastr::rasterise(stat_ewcdf(geom='line',  
+                                  alpha=1, 
+                                  na.rm=T, 
+                                  show.legend = NA, 
+                                  size=0.2)#,
+                       # dpi=300
+                       ) + 
+    # ggrastr::rasterise(stat_ewcdf(aes(ymin=..y.., ymax=1), geom='ribbon', alpha=.1, 
+               # na.rm=T, show.legend = NA)) + 
     theme_minimal() + 
     scale_color_manual(name=legend_title, values=pal) + 
     scale_fill_manual(name=legend_title, values=pal) + 
@@ -171,6 +177,7 @@ density_chart <- function(graph_data,
                                                  b = 0, 
                                                  l = 0, 
                                                  unit = "pt")),
+          axis.title.x = element_text(face="bold"),
           axis.ticks=element_line(color = "black"),
           axis.ticks.length = unit(-0.1, "cm")) + 
     # guides(guide_legend(override.aes = list(size = .01))
@@ -433,7 +440,10 @@ choropleth_map <- function(
   chart_title,
   chart_subtitle,
   weighted_metrics,
-  include_basemap=TRUE
+  include_basemap=TRUE,
+  legend_position=c(0.10, 0.075),
+  include_compass=FALSE,
+  metric_long_name=NULL
 ){
   # cloropleth map by census tract
   clean_data <- st_transform(clean_data, 4326)
@@ -442,11 +452,15 @@ choropleth_map <- function(
   clean_data <- st_transform(clean_data, 3857)
   # centroids <- st_coordinates(st_centroid(clean_data$geometry)) %>% data.frame()
   
-  guide_name <- paste0(c("Median ",toupper(metric_name)," (",metric_label,")"),collapse="")
+  if(is.null(metric_long_name)){
+    metric_long_name <- toupper(metric_name)
+  }
+  
+  guide_name <- paste0(c("Average ",metric_long_name," (",metric_label,")"),collapse="")
   # centroids <- centroids[is.finite(rowSums(centroids)),]
   
   # center_centroid <- st_centroid()
-  map_data <- clean_data[,c("metric_median", "geometry", "state_fips")]
+  map_data <- clean_data[,c("metric_mean", "geometry", "state_fips")]
   
   basemap <- ggplot()
   
@@ -455,7 +469,7 @@ choropleth_map <- function(
     # https://stackoverflow.com/questions/52704695/is-ggmap-broken-basic-qmap-produces-arguments-imply-differing-number-of-rows
     basemap_files <- ggmap::get_stamenmap(bbox=b, 
                                 zoom=ggmap::calc_zoom(b, adjust=as.integer(0)),
-                                maptype="toner-background")
+                                maptype="terrain")
     
     basemap_files <- ggmap_bbox(basemap_files)
     
@@ -463,14 +477,18 @@ choropleth_map <- function(
   }
   
   o <- basemap + geom_sf_rast(
-    geom_sf(data=map_data, aes(fill=metric_median, color=metric_median),
+    geom_sf(data=map_data, 
+            aes(fill=metric_mean, color=metric_mean),
             size=0.1,
             # color=NA,#"white"
             alpha=0.8,
-            inherit.aes = FALSE), dpi=NULL, dev=NULL) + 
-    geom_sf(fill = "transparent", color = "#7B7D7B", #"gray20",
+            inherit.aes = FALSE), dpi=300, dev=NULL) #+ 
+    geom_sf(data = map_data %>% group_by(state_fips) %>% summarise(),
+            fill = "transparent", 
+            color = "#7B7D7B", #"gray20",
             size = 0.075,
-            data = map_data %>% group_by(state_fips) %>% summarise()) #+
+            inherit.aes = FALSE
+            ) #+
     # coord_sf(crs = 4326, #26945, #
     #          xlim = c(b['left'], b['right']),
     #          ylim = c(b['bottom'], b['top']),
@@ -480,7 +498,7 @@ choropleth_map <- function(
     # weighted_metrics$metric_lower,
     weighted_metrics$metric_min,
     metric_cutoff_level,
-    weighted_metrics$metric_median,
+    weighted_metrics$metric_mean,
     weighted_metrics$metric_max
     # weighted_metrics$metric_upper
   ), decreasing=F))
@@ -491,7 +509,9 @@ choropleth_map <- function(
     # geom_polygon(data = spdf_fortified, 
     #              aes(fill = nb_equip, x = long, y = lat, group = group) , 
     #              size=0, alpha=0.9) +
-    theme_void() +
+    theme_void() + 
+    # ggsn::north(data=map_data, location="bottomright", symbol = 16, scale = .25) + 
+    # ggsn::scalebar(data=map_data, location="bottomright") + 
     # scale_colour_identity(
     # scale_fill_identity() +
     scale_color_gradientn(
@@ -518,16 +538,19 @@ choropleth_map <- function(
       values = color_values,
       na.value = "#B3B3B3",
       guide = guide_colorbar(direction="horizontal",
-                             title.position = 'bottom'),
+                             title.position = 'top'),
       name=guide_name) +
     labs(
       title = chart_title,
       subtitle = chart_subtitle
     ) +
     theme(
-      legend.position = c(0.20, 0.15)
+      legend.position = legend_position
     ) #+
   #coord_map()
+  if(include_compass){
+    p <- p + ggsn::north(data=map_data, location="bottomright", symbol = 16, scale = .25)
+  }
   return(p)
 }
 
@@ -652,7 +675,7 @@ scatter_chart <- function(graph_data,
                           metric_cutoff_label, 
                           chart_title, 
                           chart_subtitle,
-                          independent_variable
+                          dependent_variable
   
 ){
   legend_title <- group_columns
@@ -692,7 +715,7 @@ scatter_chart <- function(graph_data,
   
   chart <- graph_data %>% 
     ggplot(aes_string(x=metric_name, 
-                      y=independent_variable,
+                      y=dependent_variable,
                       weight="group_household_weights",
                       color=if(is.null(group_columns)){group_columns}else{
                         "group_name"
@@ -710,7 +733,7 @@ scatter_chart <- function(graph_data,
                         # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
                       }
     ))# + 
-  scatter_chart <- chart + 
+  scatter_plot <- chart + 
     stat_density_2d(aes(alpha = ..piece..), geom="polygon") +
     guides(alpha = FALSE) +
     stat_smooth(method = "lm", fullrange = TRUE) +
@@ -728,11 +751,11 @@ scatter_chart <- function(graph_data,
     theme_void() + 
     theme(legend.position = "none") + 
     labs(title = NULL, x=NULL, y=NULL) + 
-    ggtitle("Monthly Electricity Cost vs. EROI") + 
+    # ggtitle("Monthly Electricity Cost vs. EROI") + 
     plot_spacer() + 
-    electricity_v_eroi_contour_plot + 
+    # electricity_v_eroi_contour_plot + 
     theme(legend.justification = c(1, 1), legend.position = c(1, 1), legend.title=element_blank()) + 
-    mean_eroi + 
+    # mean_eroi + 
     coord_flip() + 
     theme_void() + 
     theme(legend.position = "none") + 

@@ -1,0 +1,279 @@
+---
+title: "Net Energy Equity"
+author: "Eric Scheier"
+institute: 
+  - "University of North Carolina - Chapel Hill"
+  - "Environment, Ecology, and Energy Program (E3P)"
+  - "Advising Committee: Noah Kittner (Chair), Nikhil Kaza, & Andy Yates"
+  - "This Presentation Will Be Recorded"
+date: "`r format(Sys.time(), '%Y-%B-%d')`"
+output: 
+  beamer_presentation:
+    slide_level: 1
+    toc: false #true
+    theme: "Berkeley"
+    colortheme: "seagull"
+    fonttheme: "structurebold"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{makecell}
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+# Why Energy Equity?
+
+\begin{columns}
+\column{0.8\textwidth}
+```{r sdgs, out.width="80%", fig.cap=""}
+knitr::include_graphics("Goal-7-infographic.png")
+```
+\column{0.2\textwidth}
+[Source: United  
+Nations]
+\end{columns}
+
+# Why the United States?
+
+```{r insecurity, out.width="100%", fig.cap=""}
+knitr::include_graphics("texas_blackout_home.jpg")
+# knitr::include_graphics("EIA_RECS_2015_insecurity.png")
+
+# + 1 in 3 U.S. households report facing a challenge in meeting energy needs
+# + 1 in 5 households report reducing or forgoing necessities such as food and medicine to pay an energy bill
+# + 1 in 7 reporte receiving a disconnection notice for energy service
+# + 1 in 10 report keeping their home at an unhealthy or unsafe temperature
+
+# [Source: U.S. Energy Information Administration, Residential Energy Consumption Survey 2015]
+```
+
+[Source: The Guardian]
+
+# Previous Analyses
+
++ Pachauris & Rao: development context of SDG 7  
+    + Multi-tier framework: duration, quality, reliability, capacity, levels, & affordability
+    + Simplified alternative framework: availability, cost, level, & affordability
++ Bednar & Reames: follows UK policy history from 2000  
+    + Energy Burden: energy spending > 10% of inome
+    + Low Income High Cost: income/cost lower/higher than average
+    + Low Income Low Efficiency: added home efficiency rating
++ Brown et al.: Why does the U.S. have energy poverty in the first place?
+    + 2020a: bibliometric analysis of 183 papers
+    + 2020b: thematic exploration of issue cause and effect
++ ACEEE: Distinct urban and rural analyses of energy burden
+    + The High Cost of Energy in Rural America (Ross et al.)
+    + The US Low-Income Energy Affordability Landscape (Drehobl and Ross)
+
+# Limitations
+
++ Require many varaibles / data (e.g. efficiency standards)
++ Mix of energy access, insecurity, poverty, and affordability
++ Focus on highly specific geographies or aggregates
++ Depend on strict cutoffs
++ Annual timescale
+
+# New Data
+
+Low-Income Energy Affordability Data (LEAD)
+
+**Purpose**: "to help state and local partners understand housing and energy characteristics for the low- and moderate-income (LMI) communities they serve"
+
+  + **Source**: U.S. Department of Energy
+  + **Method**: Iterative Proportional Fitting (IPF) of responses from the 5-year American Community Survey (ACS-5)
+  + **Geography**: Census tracts for 50 states, D.C., & P.R.
+  + **Provides**: Incomes and Energy Costs by Housing Characteristics
+  + **Years**: 2016, 2018
+
+# Cohort Attributes
+
++ Census Tract [n=~70,000]
++ Income Bracket (% of AMI or FPL) [5]
++ Housing Tenure (Rent / Own) [2]
++ Building Age (increments of 10-20 years from 1940) [6]
++ Number of Units (1, 2, 3-4, 5-9, etc.) [10]
++ Primary Heating Fuel (Electric, Gas, Solar, Wood, etc.) [9]
+
+For each combination we have the average annual:  
+
++ Income
++ Electricity, Gas, & Other Fuel Spending
+
+5,400 types of home *per census tract*  
+~400 million cohorts (most with 0 households)  
+~60 GB of data
+
+# Simplified Cohort Attributes
+
+Simplify:
+
++ Census Tract [~70,000]
++ Income Bracket (high/medium/low compared to AMI or above/below FPL) [2-3]
++ Housing Tenure (Rent / Own) [2]
++ ~~Building Age (increments of 10-20 years from 1939) [6]~~
++ Number of Units (Single vs. Multi-family) [2]
++ Primary Heating Fuel (Electric, Gas, Solar, Other) [4 - optional]
+
+8-48 types of home  
+~0.5-5 million cohorts  
+~1 GB of data
+
+# Complementary Data
++  Emissions & Generation Resource Integrated Database (eGRID)
+    + Source: U.S. Environmental Protection Agency
+    + Provides: Fuel sources for electricity generation
++ 5-Year American Community Survey (ACS)
+    + Source: U.S. Census Bureau
+    + Provides: Shapefiles by Census Tract
++ Renewable Energy Potential of Low-Income Communities in America (REPLICA) Dataset
+    + Source: U.S. Department of Energy
+    + Provides: Demographics, Rooftop Solar Potential, Climate
++ Energy Information Agency Form 861 (EIA=861)
+    + Source: U.S. Energy Information Agency
+    + Provides: Electricity Prices
++ Energy Information Agency Form 857 (EIA-857)
+    + Source: U.S. Energy Information Agency
+    + Provides: Natural Gas Prices
+
+# Local Attributes Available
+
++ *Electric Utility Type (Publicly/Privately Held, Cooperative, Government-Owned)
++ *State Electricity Fuel Composition
++ Rooftop Solar Potential (MW, MWh, Rooftop Area)
++ Demographics (Age, Gender, Race, Education, Religion)
++ Climate (Heating/Cooling Degree Days, Climate Zone)
+
+*Used in the present analysis
+
+# Methods
+
+Tasks
+
++ Aggregate state data into a national dataset
++ Merge LEAD and REPLICA
++ Incorporate EPA eGRID and other supplemental data
++ Clean, simplify, and make interpretable names
++ Performed for 2018 (most recent year of data available)
+
+Infrastructure
+
++ Reproducible Research
+    + Uses The R Project for Statistical Computing
+    + Code is fully open source (GNU Affero GPL v3.0)
+    + https://github.com/ericscheier/net_energy_equity
++ AWS m4.4xlarge EC2 instance
+    + 16 vCPUs, 64 GB RAM, 256 GB EBS Storage
+    + Linux Ubuntu 20.04 LTS (Focal Fossa)
+
+# Energy Burden & Net Energy Return
+
+\[
+G_{income} = Gross\ Income
+\]
+
+\[
+S_{energy} = Spending\ on\ Energy
+\]
+
+\[
+Energy\ Burden = \frac{S_{energy}}{G_{income}}
+\]
+**"Energy poverty: spend >10% of income on energy."**
+\[
+Net\ Energy\ Return = \frac{G_{income} - S_{energy}}{S_{energy}}
+\]
+**"Energy poverty: earn <$9 for every \$1 spent on energy."**
+
+# Why Net?
+
+```{r comparison, fig.cap=""}
+knitr::include_graphics("net_energy_equity_files/figure-latex/metric-comparison-1.pdf")
+```
+
+# Summary
+
+```{r load-table, include=FALSE}
+print_table <- read_csv("comparison_table.csv")
+```
+
+
+```{r table, results="asis"}
+print_table %>%  knitr::kable(booktabs=T, ) %>%
+  kable_styling(latex_options="scale_down")
+  #kableExtra::kable_styling(latex_options = c("striped","hold_position"))
+```
+
+# Geography
+
+```{r pressure, fig.cap=""}
+knitr::include_graphics("net_energy_equity_files/figure-latex/continental-map-1.pdf")
+```
+
+# Urban Centers
+
+```{r, fig.cap=""}
+knitr::include_graphics("net_energy_equity_files/figure-latex/inset-map-1.pdf")
+```
+
+
+# Household Breakdowns
+
+```{r breakdowns, fig.cap=""}
+knitr::include_graphics("net_energy_equity_files/figure-latex/density-charts-1.pdf")
+```
+
+# State Comparison
+
+```{r states, fig.cap=""}
+knitr::include_graphics("net_energy_equity_files/figure-latex/state-violin-1.pdf")
+```
+
+# Conclusions
+
++ 10% of households experience energy poverty as presently defined (>10% of household income on energy expenditures)
++ 78% of households below the federal poverty line also face energy poverty
++ Fewer than 1% of those above the federal poverty line face this scarcity
++ Fossil fuel reliance does not lead to lower energy poverty rates at a state scale
++ Solar power is associated with decreased energy poverty at a household scale
++ Energy poverty presents an obstacle to decarbonization and wealth creation
+
+# Conclusions
+
+Energy expenditures in the US disproportionately burden those in:
+
++ The Black Belt across the Southeastern U.S.
++ Hispanic communities near the U.S.-Mexico border
++ Native American lands
++ The rural Northeast
++ Urban Centers
+
+The United States should develop and implement a federal energy poverty line.
+
+# Future Research
+
++ Include additional demographic and techno-economic data found in the REPLICA Dataset
++ Focus on certain jurisdictions (zip codes, cities, counties, utilities)
++ Examine unusual outcomes (e.g. 20% of those below poverty line who are not in energy poverty)
++ Formally compare different metrics to identify which are suited for what purposes
+
+# Acknowledgements
+
+- Noah Kittner
+- Nikhil Kaza
+- Andy Yates
+- Paul Leslie
+- Leda Van Doren
+- Violet Anderson
+- Karyn Miller
+- Chuck, Sue, and Beau Scheier
+
+# Thank You
+
+Questions?

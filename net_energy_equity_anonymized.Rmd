@@ -2,19 +2,6 @@
 title: Net energy metrics reveal striking disparities across United States household energy burdens
 subtitle: 
 titlerunning: Net Energy Equity
-authorrunning: Scheier & Kittner
-thanks:
-author:
- - Eric Scheier:
-     institute: e3p
- - name: Noah Kittner
-   email: kittner@unc.edu
-   institute: [gillings, planning, e3p]
-   correspondence: true
-institute:
- - e3p: Environment, Ecology, and Energy Program, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
- - gillings: Department of Environmental Sciences and Engineering, Gillings School of Global Public Health, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
- - planning: Department of City and Regional Planning, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
 keywords:
   - energy burden
   - net energy
@@ -31,18 +18,10 @@ output:
     number_sections: false
     keep_tex: true
     documentclass: article
-    pandoc_args:
-      - '--lua-filter=scholarly-metadata.lua'
-      - '--lua-filter=author-info-blocks.lua'
-    includes:  
-      in_header: preamble-latex.tex
   bookdown::html_document2:
     number_sections: false
   bookdown::word_document2:
     number_sections: false
-    pandoc_args:
-      - '--lua-filter=scholarly-metadata.lua'
-      - '--lua-filter=author-info-blocks.lua'
   bookdown::pdf_book:
     base_format: rticles::springer_article
     keep_tex: true
@@ -334,7 +313,7 @@ ami_top_metrics <- grouped_weighted_metrics(ami_graph_data,
                          lower_quantile_view=0.00)
 ```
 
-\newpage
+<!-- \newpage -->
 
 **Abstract: Energy poverty in the United States is an issue of increasing urgency, exacerbated by rising inequality. Few policy-relevant datasets evaluate the energy burden of typical American households. Here, we develop a framework using net energy analysis and socioeconomic data at the census tract-level to observe systematic energy inequity across the United States among critical groups that heed policy attention. We find substantial instances of energy poverty in the United States -- `r scales::percent(energy_poverty_rate, accuracy=1)` of households experience energy poverty as presently defined as spending more than 10% of household income on energy expenditures. While `r scales::percent(in_both_poverty, accuracy=1)` of households below the federal poverty line also face energy poverty, fewer than `r scales::percent(in_only_energy_poverty, accuracy=0.01)` of those above the federal poverty line face this scarcity. The federal poverty line is not enough to capture the experience and disparity in energy poverty across the United States and excludes households that would benefit immensely from programs available to support low-income communities. We identify that energy expenditures across census tracts disproportionately burden Black, Hispanic, and Native American communities. For solar, wind, and energy efficiency to address socioeconomic mobility, programs must reduce relative energy expenditures by expanding eligibility requirements for support and access to improved conservation measures, efficiency upgrades, and distributed renewables. We recommend the United States  develop a more inclusive federal energy poverty categorization that provides greater assistance for household energy costs.**
 
@@ -1449,7 +1428,8 @@ Net energy analysis (NEA) offers potential support to understanding energy pover
 
 ## Code Availability {#code-availability}
 
-The code and data to fully reproduce this paper are available on Github at [https://github.com/ericscheier/net_energy_equity](https://github.com/ericscheier/net_energy_equity) under the GNU Affero General Public License v3.0.
+The code and data to fully reproduce this paper are available on Github at **[redacted for anonymity - copies of data and code have been submitted as part of peer-review]** under the GNU Affero General Public License v3.0.
+
 
 ## Data Availability  {#data-availability}
 
@@ -1478,7 +1458,7 @@ All data necessary for the composition of the source datasets used in this analy
 
 ## Author Contributions  {#author-contributions}
 
-ES and NK conceived of and designed the project. ES created the software used for data acquisition and analysis and created the figures. NK contributed the introduction of the topic and interpretation of the results.
+X and Y conceived of and designed the project. X created the software used for data acquisition and analysis and created the figures. Y contributed the introduction of the topic and interpretation of the results.
 
 ## Competing Interests  {#competing-interests}
 

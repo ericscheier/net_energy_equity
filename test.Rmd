@@ -1,0 +1,88 @@
+---
+title: Net energy metrics reveal striking disparities across United States household energy burdens
+subtitle: 
+titlerunning: Net Energy Equity
+authorrunning: Scheier & Kittner
+thanks:
+author:
+  - Eric Scheier:
+      institute: e3p
+  - name: Noah Kittner
+    email: kittner@unc.edu
+    institute: [gillings, e3p, planning]
+    correspondence: true
+institute:
+  - e3p: Environment, Ecology, and Energy Program, The University of North Carolina at Chapel Hill
+  - gillings: Department of Environmental Sciences and Engineering, The University of North Carolina at Chapel Hill
+  - planning: Department of City and Regional Planning, The University of North Carolina at Chapel Hill
+keywords:
+  - energy burden
+  - net energy
+  - macro-energy systems
+  - energy inequality
+bibliography: references.bib
+bibstyle: spphys
+csl: nature-no-et-al.csl
+journalname: Nature Energy
+date: "`r format(Sys.time(), '%d %B %Y')`"
+toc: false
+output:
+  bookdown::word_document2:
+    keep_tex: true
+    documentclass: article
+    pandoc_args:
+      - '--lua-filter=scholarly-metadata.lua'
+      - '--lua-filter=author-info-blocks.lua'
+    header-includes:
+      - \usepackage{setspace}\doublespacing
+  bookdown::html_document2: default
+  bookdown::pdf_document2:
+    keep_tex: true
+    documentclass: article
+    pandoc_args:
+      - '--lua-filter=scholarly-metadata.lua'
+      - '--lua-filter=author-info-blocks.lua'
+    header-includes:
+      - \usepackage[left]{lineno}\linenumbers
+  bookdown::pdf_book:
+    base_format: rticles::springer_article
+    keep_tex: true
+tables: true
+fig_caption: true
+header-includes:
+- \usepackage{booktabs}
+- \usepackage[left]{lineno}\linenumbers
+- \usepackage{etoolbox}
+- \pretocmd{\abstract}{\newpage}{}{}
+---
+
+
+---
+abstract: | 
+  Energy poverty in the United States is an issue of increasing urgency, exacerbated by rising inequality. Few policy-relevant datasets evaluate the energy burden of typical American households. Here, we develop a framework using net energy analysis and socioeconomic data at the census tract-level to observe systematic energy inequity across the United States among critical groups that heed policy attention.
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

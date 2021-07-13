@@ -1,0 +1,158 @@
+---
+title: "Energy Poverty in the U.S."
+author: "Eric Scheier"
+institute: 
+  - "ENVR 890"
+date: "`r format(Sys.time(), '%Y-%B-%d')`"
+output: 
+  beamer_presentation:
+    slide_level: 1
+    toc: false #true
+    theme: "Berkeley"
+    colortheme: "seagull"
+    fonttheme: "structurebold"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{makecell}
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(knitr)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+# Why Energy Poverty?
+
+\begin{columns}
+\column{0.6\textwidth}
+```{r sdgs}
+knitr::include_graphics("Goal-7-infographic.png")
+```
+
+\column{0.4\textwidth}
+[Source: United Nations]
+\end{columns}
+
+
+# Why the United States?
+
+```{r insecurity}
+knitr::include_graphics("texas_blackout_home.jpg")
+# knitr::include_graphics("EIA_RECS_2015_insecurity.png")
+
+# + 1 in 3 U.S. households report facing a challenge in meeting energy needs
+# + 1 in 5 households report reducing or forgoing necessities such as food and medicine to pay an energy bill
+# + 1 in 7 reporte receiving a disconnection notice for energy service
+# + 1 in 10 report keeping their home at an unhealthy or unsafe temperature
+
+# [Source: U.S. Energy Information Administration, Residential Energy Consumption Survey 2015]
+```
+
+# Urban Centers
+
+```{r}
+knitr::include_graphics("net_energy_equity_files/figure-latex/urban-map-1.pdf")
+```
+
+# Previous Analyses
+
++ Bednar & Reames - compares 3 energy poverty metrics used in UK
++ Petchari et al. - examines more sophisticated metrics in the context of SDG 7
++ Brown et al - Why does the U.S. have energy poverty in the first place?
++ Sergi et. al - How can decarbonization alleviate health and poverty?
++ ACEEE - Performed distinct urban and rural analysis of energy burden
+
+# Energy Burden & Net Energy Return
+
+\[
+G_{income} = Gross\ Income
+\]
+
+\[
+S_{energy} = Spending\ on\ Energy
+\]
+
+
+\[
+Energy\ Burden = \frac{S_{energy}}{G_{income}}
+\]
+
+\[
+NetEnergyReturn_{household} = \frac{G_{income} - S_{energy}}{S_{energy}}
+\]
+
+Energy Poverty = 10% or more of income toward energy
+
+# Why Net?
+
+```{r comparison}
+knitr::include_graphics("net_energy_equity_files/figure-latex/metric-comparison-1.pdf")
+```
+
+# Summary
+
+```{r load-table, include=FALSE}
+print_table <- read_csv("comparison_table.csv")
+```
+
+```{r table, results="asis"}
+print_table %>%  knitr::kable(booktabs=T, ) %>%
+  kable_styling(latex_options="scale_down")
+  #kableExtra::kable_styling(latex_options = c("striped","hold_position"))
+```
+
+# Geography
+
+```{r pressure}
+knitr::include_graphics("net_energy_equity_files/figure-latex/continental-map-1.pdf")
+```
+
+# Urban Centers
+
+```{r}
+knitr::include_graphics("net_energy_equity_files/figure-latex/urban-map-1.pdf")
+```
+
+# Household Breakdowns
+
+```{r}
+knitr::include_graphics("net_energy_equity_files/figure-latex/density-charts-1.pdf")
+```
+
+# State Comparison
+
+```{r}
+knitr::include_graphics("net_energy_equity_files/figure-latex/state-violin-1.pdf")
+```
+
+# Conclusions
+
++ 10% of households experience energy poverty as presently defined as spending more than 10% of household income on energy expenditures.
++ While 78% of households below the federal poverty line also face energy poverty, fewer than 1% of those above the federal poverty line face this scarcity. 
++ Energy Poverty presents an obstacle to debarbonization and wealth creation
+
+# Conclusions
+
+Energy expenditures in the US disproportionately burden those in:
+
++ The Black Belt across the Southeastern U.S.
++ Hispanic communities near the U.S.-Mexico border
++ Native American lands
++ Urban Centers
+
+The United States should develop and implement a federal energy poverty line
+
+# Future Research
+
++ Include additional demographic and techno-economic data found in Renewable Energy Potential of Low-Income Communities in America (REPLICA) Dataset
++ Focus on certain jurisdictions (cities, counties, utilities)
++ Examine unusual outcomes (e.g. 20% of those below poverty line who are not in energy poverty)
++ Formally compare different metrics to identify which are suited for what purposes
+
+# Questions
+
+Questions?

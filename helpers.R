@@ -110,3 +110,27 @@ calculate_weighted_metrics <- function(graph_data,
   
   return(weighted_metrics)
 }
+
+to_dollar <- function(x){
+  y <- scales::label_dollar(largest_with_cents = 10)(x)
+  y[is.na(x)] <- ""
+  return(y)
+}
+
+to_percent <- function(x){
+  y <- scales::label_percent(accuracy = 1,big.mark=",")(x) #dollar_format(largest_with_cents = 10)(x)
+  y[is.na(x)] <- ""
+  return(y)
+}
+
+to_big <- function(x){
+  y <- scales::label_comma(accuracy=1,big.mark = ",")(x)
+  y[is.na(x)] <- ""
+  return(y)
+}
+
+to_million <- function(x, suffix=" million"){
+  y <- scales::label_number(accuracy = 0.1, suffix = suffix)(x * 10^-6)
+  y[is.na(x)] <- ""
+  return(y)
+}
