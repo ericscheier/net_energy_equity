@@ -15,7 +15,7 @@ institute:
  - e3p: Environment, Ecology, and Energy Program, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
  - gillings: Department of Environmental Sciences and Engineering, Gillings School of Global Public Health, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
  - planning: Department of City and Regional Planning, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
- - emergi: Emergi Foundation
+ - emergi: Emergi Foundation, Carrboro, NC, USA
 keywords:
   - energy burden
   - net energy
@@ -109,7 +109,7 @@ options(knitr.table.format = function() {
 edit_color = "black" #"red" #"black
 strike_show = "hide" #"show" #"hide"
 hide = "FALSE" #"TRUE" #
-highlight = "TRUE" #"FALSE"
+highlight = "FALSE" #"TRUE" #"FALSE"
 ```
 
 ```{r option-view, include=FALSE}
@@ -1429,11 +1429,11 @@ REPLICA: The Renewable Energy Potential of Low-Income Communities in America (RE
 eGRID: We use the [EPA]{color=`r edit_color`}'s eGRID[@usepaEmissionsGenerationResource2020] to calculate the proportion of household energy expenditures that support fossil fuel combustion through the purchase of electricity. 100% of natural gas purchases are considered to support fossil fuel combustion. Electricity purchases are divided into their respective sources according to the state proportions indicated by the "STCLPR" (coal), "STOLPR" (oil), "STGSPR" (gas), and "STOFPR" (other fossil) fields in the 2018 eGRID dataset. Other expenditures are divided according to the primary heating fuels other than electricity or natural gas used by American households according to the Census, which are approximately `r scales::percent(pct_other_fossil, accuracy=1)` fossil fuel combustion.
 
 #### Treatment  {#treatment}
-The LEAD data represents the unit’s ownership status (OWNER vs. RENTER) and income bracket as a fraction of [AMI]{color=`r edit_color`} (0-30%, 30-60%, 60-80%, 80-100%, or 100%+) or [FPL]{color=`r edit_color`} (0-100%, 100-150%, etc.). These categorical variables are saved as factors. Then we create min_units from BLD INDEX, a variable which represents a non-uniformly distributed set of buckets for the range of the number of units in the building and whether single-unit households are attached or detached from neighboring households (1 ATTACHED, 1 DETACHED, 2 UNIT, 3-4 UNIT, 5-9 UNIT, 10-19 UNIT, 20-49 UNIT, 50+ UNIT, MOBILE_TRAILER, BOAT_RV_VAN, OTHER UNIT). We extract the minimum number of units from the range and whether the building is detached. Those households labeled OTHER UNIT, MOBILE_TRAILER, or BOAT_RV_VAN are given values of Not Applicable (NA) for this characteristic. Finally, we calculate S and G of which each metric is composed: 
+The LEAD data represents the unit’s ownership status (OWNER vs. RENTER) and income bracket as a fraction of [AMI]{color=`r edit_color`} (0-30%, 30-60%, 60-80%, 80-100%, or 100%+) or [FPL]{color=`r edit_color`} (0-100%, 100-150%, etc.). These categorical variables are saved as factors. Then we create min_units from BLD INDEX, a variable which represents a non-uniformly distributed set of buckets for the range of the number of units in the building and whether single-unit households are attached or detached from neighboring households (1 ATTACHED, 1 DETACHED, 2 UNIT, 3-4 UNIT, 5-9 UNIT, 10-19 UNIT, 20-49 UNIT, 50+ UNIT, MOBILE_TRAILER, BOAT_RV_VAN, OTHER UNIT). We extract the minimum number of units from the range and whether the building is detached. Those households labeled OTHER UNIT, MOBILE_TRAILER, or BOAT_RV_VAN are given values of Not Applicable (NA) for this characteristic. Finally, we calculate *S* and *G* of which each metric is composed: 
 
-S = annual expenditures on electricity (ELEP CAL) + natural gas (GASP CAL) + and other fuels (FULP)  
+*S* = annual expenditures on electricity (ELEP CAL) + natural gas (GASP CAL) + and other fuels (FULP)  
 
-G = the cohort’s average annual income (HINCP) 
+*G* = the cohort’s average annual income (HINCP) 
 
 The metric formulas outlined in [Applying NER to Energy Equity](#ratios) are then used to calculate each cohort’s energy poverty metrics. Since we are examining homes’ relationships with the energy system, we ignore any homes that do not use energy as denoted by rows where S==0. The estimation procedure used by the DOE results in an estimated number of occupied housing units for each cohort (UNITS, renamed as households). It displays the number of American Community Survey responses that contribute to the estimate of energy expenditures (COUNT, renamed as acs_responses). We then remove any categories with fewer than 1 unit represented since this is not physically possible. `r removed_households = "This results in removing X% of the available rows (gross: X rows of X). This is a total of X housing units or X% of the estimated total X units in the sample. We have separated any cohorts with incomes or energy costs equal to 0 into another dataset for analysis. This represents approximately X% of the housing units and X% of the examined cohorts, so it will be important to make sure that this subset does not contain systematic bias. However, these data are excluded from the current analysis under the assumption that energy costs equal to 0 are not relevant to this analysis."`
 
@@ -1471,13 +1471,13 @@ The results inferred from eGRID are only as good as the eGRID methodology itself
 
 ## Code Availability {#code-availability}
 
-The code and data to fully reproduce this paper are available on GitHub at [[https://github.com/ericscheier/net_energy_equity](https://github.com/ericscheier/net_energy_equity)]]{hide=`r hide`} under the GNU Affero General Public License v3.0.
+The code and data to fully reproduce this paper are available on GitHub at [[https://github.com/ericscheier/net_energy_equity](https://github.com/ericscheier/net_energy_equity)]{hide=`r hide`} under the GNU Affero General Public License v3.0. [The most recent release of the software can be found at [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierNewMeasurementStrategy2021].]{highlight=`r highlight`}
 
 ## Data Availability  {#data-availability}
 
-All data necessary for the composition of the source datasets used in this analysis are freely available from [US]{color=`r edit_color`} government sources as open data. All functions to automatically retrieve and assemble these data and compiled versions of these data are made available to the user as part of the software referred to in [Code Availability](#code-availability).
+[The data generated in this study have been deposited in the the Zenodo database under [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierNewMeasurementStrategy2021].]{highlight=`r highlight`}
 
-[The XX data generated in this study have been deposited in the YY database under accession code ZZ [add hyperlink here]. The XX data are available under restricted access for {insert reason}, access can be obtained by {explain how}. The raw XX data are protected and are not available due to data privacy laws. The processed XX data are available at YY. The XX data generated in this study are provided in the Supplementary Information/Source Data file. The XX data used in this study are available in the YY database under accession code ZZ [Add hyperlink here].]{highlith=`r highlight`}
+All data necessary for the composition of the source datasets used in this analysis are freely available from [US]{color=`r edit_color`} government sources as open data. All functions to automatically retrieve and assemble these data and compiled versions of these data are made available to the user as part of the software [available at [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierNewMeasurementStrategy2021].]{highlight=`r highlight`}.
 
 ## References  {#references}
 
@@ -1499,7 +1499,7 @@ All data necessary for the composition of the source datasets used in this analy
 ```
 
 ## Acknowledgements  {#acknowledgements}
-Many thanks to Nikhil Kaza and Andy Yates for insightful conversations, review, comments, feedback, and advice on this study.
+[The authors wish to thank Nikhil Kaza and Andy Yates for insightful conversations, review, comments, feedback, and advice on this study.]{highlight=`r highlight`}
 
 ## Author Contributions  {#author-contributions}
 
