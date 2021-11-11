@@ -457,6 +457,9 @@ choropleth_map <- function(
   }
   
   guide_name <- paste0(c("Average ",metric_long_name," (",metric_label,")"),collapse="")
+  guide_name <- as.expression(bquote("Average"~
+                                       .(metric_long_name)~
+                                       "("*.(metric_label)*")"))
   # centroids <- centroids[is.finite(rowSums(centroids)),]
   
   # center_centroid <- st_centroid()

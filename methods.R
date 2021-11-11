@@ -2,6 +2,7 @@ options(timeout=120)
 
 paper_methods <- function(states="all",
                           acs_version=2018,
+                          energy_burden_poverty_line=0.06,
                           refresh=FALSE){
 
   income_metric <- "AMI" #"fpl15" #"FPL" #
@@ -131,8 +132,6 @@ paper_methods <- function(states="all",
       
       data$energy_burden <- energy_burden_func(g=data$income,
                                                s=data$energy_cost)
-      
-      energy_burden_poverty_line <- 0.10
       
       #For further analysis, I will add a designation of whether a cohort is, on average, in energy poverty depending on whether the mean energy burden is above `r label_percent()(energy_burden_poverty_line)`.
       

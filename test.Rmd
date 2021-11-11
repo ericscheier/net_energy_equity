@@ -27,23 +27,25 @@ journalname: Nature Energy
 date: "`r format(Sys.time(), '%d %B %Y')`"
 toc: false
 output:
-  bookdown::word_document2:
-    keep_tex: true
-    documentclass: article
-    pandoc_args:
-      - '--lua-filter=scholarly-metadata.lua'
-      - '--lua-filter=author-info-blocks.lua'
-    header-includes:
-      - \usepackage{setspace}\doublespacing
-  bookdown::html_document2: default
   bookdown::pdf_document2:
     keep_tex: true
     documentclass: article
     pandoc_args:
+      - '--lua-filter=color-text.lua'
       - '--lua-filter=scholarly-metadata.lua'
       - '--lua-filter=author-info-blocks.lua'
     header-includes:
       - \usepackage[left]{lineno}\linenumbers
+  bookdown::html_document2: default
+  bookdown::word_document2:
+    keep_tex: true
+    documentclass: article
+    pandoc_args:
+      - '--lua-filter=color-text.lua'
+      - '--lua-filter=scholarly-metadata.lua'
+      - '--lua-filter=author-info-blocks.lua'
+    header-includes:
+      - \usepackage{setspace}\doublespacing
   bookdown::pdf_book:
     base_format: rticles::springer_article
     keep_tex: true
@@ -54,6 +56,11 @@ header-includes:
 - \usepackage[left]{lineno}\linenumbers
 - \usepackage{etoolbox}
 - \pretocmd{\abstract}{\newpage}{}{}
+- \usepackage{color}
+- \usepackage{soul}
+- \definecolor{lightblue}{rgb}{0.90, 0.95, 1}
+- \definecolor{fancycolor}{rgb}{0.258, 0.517, 0.960}
+- \sethlcolor{fancycolor}
 ---
 
 
@@ -65,13 +72,28 @@ abstract: |
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+edit_color="red"
 ```
+
+Substantive edits based on peer-review are [red]{color=`r edit_color`}, with major standalone deletions denoted by [~~red strikethrough~~]{color=`r edit_color`}. Rearrangements of existing text order are not necessarily noted in this document.
+
+[This text should be struck through]{strike="show"}
+
+[[This text should be red and struck through]{strike="show"}]{color="red"}
+
+[This text should not appear at all]{strike="hide"}
+
+[This text should be highlighted]{highlight="TRUE"}
+
+*N~h~*
 
 ## R Markdown
 
 This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+(ref:metric-comparison-fig-cap) Display of the relationship between [E~b~]{color=`r edit_color`} and [N~h~]{color=`r edit_color`} with net income (gross income - energy expenditures) for US households.
 
 ```{r cars}
 summary(cars)
@@ -81,8 +103,23 @@ summary(cars)
 
 You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
+```{r pressure, echo=FALSE, fig.cap='(ref:metric-comparison-fig-cap)'}
 plot(pressure)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+library(magrittr)
+library(knitr)
+library(kableExtra)
+df <- data.frame(Parameter = c("NO\\textsubscript{x} emissions", "SO\\textsubscript{2} emissions", "CO\\textsubscript{2}     emissions"),
+                 "Value mg/Nm\\textsuperscript{3}" = c("800\\%",900,1000),
+                 check.names = F)
+
+knitr::kable(df,escape = F, caption = 'Example table!',  booktabs = TRUE, format = "latex") %>% #
+  row_spec(0, bold = T, color = "white", background = "#045a8d") %>%
+  row_spec(c(2), bold = T, color = "white", background = "#3690c0")
+```
+
+blah blah

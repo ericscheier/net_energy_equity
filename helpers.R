@@ -76,8 +76,8 @@ calculate_weighted_metrics <- function(graph_data,
                                        group_columns, 
                                        metric_name, 
                                        metric_cutoff_level, 
-                                       upper_quantile_view, 
-                                       lower_quantile_view){
+                                       upper_quantile_view=1.0, 
+                                       lower_quantile_view=0.0){
   
   weighted_metrics <- grouped_weighted_metrics(graph_data, 
                                                group_columns=NULL, 
@@ -111,14 +111,22 @@ calculate_weighted_metrics <- function(graph_data,
   return(weighted_metrics)
 }
 
-to_dollar <- function(x){
-  y <- scales::label_dollar(largest_with_cents = 10)(x)
+to_dollar <- function(x,latex=FALSE){
+  if(latex){
+    y <- scales::label_dollar(largest_with_cents = 10,prefix="\\$")(x)
+  } else {
+    y <- scales::label_dollar(largest_with_cents = 10)(x)
+  }
   y[is.na(x)] <- ""
   return(y)
 }
 
-to_percent <- function(x){
-  y <- scales::label_percent(accuracy = 1,big.mark=",")(x) #dollar_format(largest_with_cents = 10)(x)
+to_percent <- function(x,latex=FALSE){
+  if(latex){
+    y <- scales::label_percent(accuracy = 1,big.mark=",",suffix="\\%")(x)
+  } else {
+    y <- scales::label_percent(accuracy = 1,big.mark=",")(x)
+  }
   y[is.na(x)] <- ""
   return(y)
 }
@@ -133,4 +141,14 @@ to_million <- function(x, suffix=" million"){
   y <- scales::label_number(accuracy = 0.1, suffix = suffix)(x * 10^-6)
   y[is.na(x)] <- ""
   return(y)
+}
+
+#https://bookdown.org/yihui/rmarkdown-cookbook/font-color.html
+colorize <- function(x, color) {
+  if (knitr::is_latex_output()) {
+    sprintf("\\textcolor{%s}{%s}", color, x)
+  } else if (knitr::is_html_output()) {
+    sprintf("<span style='color: %s;'>%s</span>", color,
+            x)
+  } else x
 }
