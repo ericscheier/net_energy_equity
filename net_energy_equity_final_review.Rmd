@@ -1516,9 +1516,8 @@ knitr::write_bib(x = r_packages_used, file = "bibliography.bib")
 
 ## Tables
 
-\captionsetup[table]{labelformat=empty}
 Table \@ref(tab:comparison-table): 
-
+\captionsetup[table]{labelformat=empty}
 ```{r comparison-table-display, include=TRUE, results="asis"}
 final_table
 ```
