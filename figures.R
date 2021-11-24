@@ -155,6 +155,7 @@ density_chart <- function(graph_data,
           legend.title=element_text(size=8),#element_blank(),
           legend.text=element_text(size=6), 
           legend.key.size = unit(10, "points"),
+          legend.spacing.y = unit(0.05, 'points'),
           panel.background = element_blank(),#element_rect(fill="#f1f1f1"),
           panel.grid.major = element_blank(),#element_line(color="#DCDCDC"),
           panel.grid.minor = element_blank(),#element_line(color="#DCDCDC"),
@@ -269,7 +270,10 @@ make_violin_chart <- function(graph_data,
   
   if(is.null(x_label)){
     x_label <- paste0(str_to_upper(metric_name)," (",metric_label,")")
+      
   }
+  
+ # x_label <- x_label
   
   # max(boxplot.stats(graph_data[[metric_name]])$stats))
   
@@ -428,6 +432,48 @@ make_violin_chart <- function(graph_data,
   return(y)
 }
 
+# scale_x_longitude <- function(xmin=-180, xmax=180, step=0.002, ...) {
+#   xbreaks <- seq(xmin,xmax,step)
+#   xlabels <- unlist(
+#     lapply(xbreaks, function(x){
+#       ifelse(x < 0, parse(text=paste0(paste0(abs(dms(x)$d), expression("*{degree}*")),
+#                                       paste0(abs(dms(x)$m), expression("*{minute}*")),
+#                                       paste0(abs(dms(x)$s)), expression("*{second}*W"))), 
+#              ifelse(x > 0, parse(text=paste0(paste0(abs(dms(x)$d), expression("*{degree}*")),
+#                                              paste0(abs(dms(x)$m), expression("*{minute}*")),
+#                                              paste0(abs(dms(x)$s)), expression("*{second}*E"))),
+#                     "0"#abs(dms(x))
+#                     ))}))
+#   return(scale_x_continuous("Longitude", breaks = xbreaks, labels = xlabels, expand = c(0, 0), ...))
+# }
+# 
+# scale_y_latitude <- function(ymin=-90, ymax=90, step=0.002, ...) {
+#   ybreaks <- seq(ymin,ymax,step)
+#   ylabels <- unlist(
+#     lapply(ybreaks, function(x){
+#       ifelse(x < 0, parse(text=paste0(paste0(abs(dms(x)$d), expression("*{degree}*")),
+#                                       paste0(abs(dms(x)$m), expression("*{minute}*")),
+#                                       paste0(abs(dms(x)$s)), expression("*{second}*S"))), 
+#              ifelse(x > 0, parse(text=paste0(paste0(abs(dms(x)$d), expression("*{degree}*")),
+#                                              paste0(abs(dms(x)$m), expression("*{minute}*")),
+#                                              paste0(abs(dms(x)$s)), expression("*{second}*N"))),
+#                     "0"#abs(dms(x))
+#                     ))}))
+#   return(scale_y_continuous("Latitude", breaks = ybreaks, labels = ylabels, expand = c(0, 0), ...))
+# }  
+
+FootnoteGridArrange <- function(
+  footnoteText = strftime(Sys.time(), format = "%d/%m/%Y"),
+  size = 1.2,
+  color = "black") {
+  grid::textGrob(
+    footnoteText,
+    gp = grid::gpar(cex = size),
+    hjust = 1,
+    x = 1
+  )
+}
+
 choropleth_map <- function(
   clean_data,
   group_columns,
@@ -441,7 +487,7 @@ choropleth_map <- function(
   chart_subtitle,
   weighted_metrics,
   include_basemap=TRUE,
-  legend_position=c(0.10, 0.075),
+  legend_position=c(0.15, 0.125),
   include_compass=FALSE,
   metric_long_name=NULL
 ){
@@ -456,9 +502,9 @@ choropleth_map <- function(
     metric_long_name <- toupper(metric_name)
   }
   
-  guide_name <- paste0(c("Average ",metric_long_name," (",metric_label,")"),collapse="")
-  guide_name <- as.expression(bquote("Average"~
-                                       .(metric_long_name)~
+  #guide_name <- paste0(c("Average ",metric_long_name," (",metric_label,")"),collapse="")
+  guide_name <- as.expression(bquote("Average"~italic(
+                                       .(metric_long_name))~
                                        "("*.(metric_label)*")"))
   # centroids <- centroids[is.finite(rowSums(centroids)),]
   
@@ -512,7 +558,8 @@ choropleth_map <- function(
     # geom_polygon(data = spdf_fortified, 
     #              aes(fill = nb_equip, x = long, y = lat, group = group) , 
     #              size=0, alpha=0.9) +
-    theme_void() + 
+    ## theme_void() + 
+    theme_classic() + 
     # ggsn::north(data=map_data, location="bottomright", symbol = 16, scale = .25) + 
     # ggsn::scalebar(data=map_data, location="bottomright") + 
     # scale_colour_identity(
@@ -548,8 +595,28 @@ choropleth_map <- function(
       subtitle = chart_subtitle
     ) +
     theme(
-      legend.position = legend_position
-    ) #+
+      legend.position = legend_position,
+      legend.background=element_blank(),
+    ) + 
+    labs(
+      x=NULL,
+      y=NULL
+    )
+    # coord_sf(expand = FALSE) +
+    # metR::scale_x_longitude(
+    #   #xmin=-180,
+    #   #xmax=180,
+    #   #step=0.002
+    # )+#breaks = c(33.5, 34, 34.5, 35, 35.5),
+    #                    #labels = c("33.5", "34", "34.5", "35", "35.5")) +
+    # metR::scale_y_latitude(
+    #   #xmin=-90,
+    #   #xmax=90,
+    #   #step=0.002
+    # ) + 
+    # theme(axis.line = element_line(color="black", size = 2))
+    #breaks = (c(-20, -19.5, -19, -18.5, -18,-17.5)),
+                      # labels = c("20", "19.5", "19", "18.5", "18", "17.5"))
   #coord_map()
   if(include_compass){
     p <- p + ggsn::north(data=map_data, location="bottomright", symbol = 16, scale = .25)
