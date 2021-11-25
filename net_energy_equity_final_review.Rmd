@@ -756,7 +756,7 @@ orleans_and_neighbors <- c("Orleans Parish",
 inset_map_data <- map_data %>% filter(county_name=="Orleans Parish"
                                      & state_abbr=="LA")
 
-inset_bb <- st_buffer(st_as_sfc(st_bbox(inset_map_data)) %>% st_transform(3857), dist=10000)
+inset_bb <- st_buffer(st_as_sfc(st_bbox(inset_map_data)) %>% st_transform(3857), dist=100000)
 
 choropleth_chart_highlight <- choropleth_map(
     clean_data=map_data,
@@ -798,7 +798,7 @@ choropleth_chart_inset <- choropleth_map(
 
 gg_inset_map = ggdraw() +
   draw_plot(choropleth_chart_inset) +
-  draw_plot(choropleth_chart_highlight, x = 0.175, y = 0.625, width = 0.35, height = 0.35)
+  draw_plot(choropleth_chart_highlight, x = 0.150, y = 0.625, width = 0.35, height = 0.35)
 
 # gg_inset_map
 
@@ -1287,9 +1287,7 @@ group_columns <- c("state_abbr")
 graph_data <- filter_graph_data(clean_data=clean_data_ami[clean_data_ami$state_abbr!="DC",], 
                                 group_columns=group_columns, 
                                 metric_name=metric_name)
-```
 
-```{r}
 # percent of "other" fuel expenditures toward fossil fuel combustion
 # want to make this more precise by state, county, and/or balancing authority eventually
 other_gwm <- grouped_weighted_metrics(clean_data_fpl[clean_data_fpl$state_abbr!="DC",], 
@@ -1308,9 +1306,7 @@ pct_other_fossil <- sum(other_fossil$household_count*other_fossil$metric_mean)/
   sum(other_gwm$household_count*other_gwm$metric_mean)
 
 graph_data$pct_other_fossil <- pct_other_fossil
-```
 
-```{r}
 # percent of each state's electric grid decidated to fossil fuel combustion
 # can refine by balancing authority based on REPLICA dataset
 egrid <- get_state_egrid()
@@ -1326,17 +1322,12 @@ egrid$pct_electricity_fossil <- egrid$STCLPR + #coal
 graph_data <- left_join(graph_data, egrid, by=c("state_fips"="FIPSST"))
 
 # graph_data <- graph_data[graph_data$state_abbr!="DC",]
-```
 
-```{r}
 # percent of natural gas expenditures dedicateed to fossil fuel combustion...
 pct_gas_fossil <- 1.0
 
 graph_data$pct_gas_fossil <- pct_gas_fossil
-```
 
-
-```{r}
 graph_data$pct_fossil_tract <- (graph_data$pct_gas_fossil * graph_data$gas_spend + 
   graph_data$pct_electricity_fossil * graph_data$electricity_spend + 
   graph_data$pct_other_fossil * graph_data$other_spend) / 
@@ -1363,9 +1354,7 @@ top_line_charts <- make_all_charts(graph_data,
                             chart_caption=NULL)
 
 state_by_state <- top_line_charts[["metrics"]]
-```
 
-```{r}
 electricity_prices_summary <- calculate_weighted_metrics(graph_data, 
                                                          c("state_abbr"), 
                                                          "dlrs_kwh", 
