@@ -133,8 +133,8 @@ density_chart <- function(graph_data,
                                   alpha=1, 
                                   na.rm=T, 
                                   show.legend = NA, 
-                                  size=0.2)#,
-                       # dpi=300
+                                  size=0.2),
+                       dpi=300
                        ) + 
     # ggrastr::rasterise(stat_ewcdf(aes(ymin=..y.., ymax=1), geom='ribbon', alpha=.1, 
                # na.rm=T, show.legend = NA)) + 
