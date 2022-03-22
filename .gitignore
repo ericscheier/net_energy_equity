@@ -140,3 +140,8 @@ venv.bak/
 *.tex
 *.png
 *.docx
+*.jpg
+*.jpeg
+
+*.aux
+*.synctex.gz
