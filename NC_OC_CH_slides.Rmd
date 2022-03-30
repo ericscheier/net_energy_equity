@@ -2,8 +2,8 @@
 title: "A measurement strategy to address disparities across household energy burdens"
 author: "Eric Scheier & Noah Kittner"
 institute: 
-  - "PLAN 574"
-  - "This Presentation Was Created On:"
+  - "Focus: Orange County, North Carolina"
+  - "These Slides Were Created On:"
 date: "`r format(Sys.time(), '%Y-%B-%d')`"
 output: 
   beamer_presentation:
@@ -15,7 +15,7 @@ output:
 header-includes:
   - \usepackage{booktabs}
   - \usepackage{makecell}
-  - \setbeameroption{show notes} #{show/hide notes}
+  - \setbeameroption{hide notes} #{show/hide notes}
   - \setbeamerfont{note page}{size=\tiny} 
 ---
 
@@ -24,6 +24,30 @@ library(tidyverse)
 library(knitr)
 options(kableExtra.latex.load_packages = FALSE)
 library(kableExtra)
+
+states <- "all" #c("ca","nc","sc") #
+refresh <- FALSE
+acs_version <- 2018
+energy_burden_poverty_line <- 0.06
+# geographic_scope <- "tract" #statecitycounty
+
+source("sources.R")
+
+clean_data_ami <- read_csv("CohortData_AreaMedianIncome.csv")
+clean_data_fpl <- read_csv("CohortData_FederalPovertyLine.csv")
+replica_sup <- read_csv("CensusTractData.csv") #get_replica_supplemental_dataset()
+
+# tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
+
+census_tracts_shp <- get_tract_shapefiles(
+    states=states,
+    acs_version=acs_version,
+    refresh=refresh,
+    return_files=TRUE,
+    all_from_list=unique(replica_sup$state_abbr)
+  )
+
+tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
 
 # make this dynamic to most recent 
 version_path <- "net_energy_equity_final_review20211217200747_files"

@@ -60,6 +60,9 @@ download_new_lead_folders <- function(refresh=TRUE, states="all"){
 
 download_lead_resource_ids <- function(replace=TRUE){
   if(!file.exists("data/LEAD_resource_ids.csv")){
+    # https://data.openei.org/submissions/573
+    # https://catalog.data.gov/harvest/7cbf9085-0290-4e9f-bec1-91653baeddfd
+    # package_id="573"
     package_id="9dcd443b-c0e5-4d4a-b764-5a8ff0c2c92b"
     full_package <- package_show(id=package_id,
                                  url = "https://openei.org/doe-opendata/",

@@ -1,5 +1,42 @@
 options(timeout=120)
 
+get_tract_shapefiles <- function(
+  states,
+  acs_version,
+  refresh,
+  return_files=FALSE,
+  all_from_list=NULL
+){
+  tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
+  if(!file.exists(tract_file_name)){
+    
+    tract_states <- states
+    if(tract_states=="all"){
+      if(!is.null(all_from_list)){
+        tract_states <- all_from_list
+      } else{
+        tract_states <- list_all_states()
+      }
+    }
+    
+    all_census_tracts <- lapply(tract_states, get_tracts, 
+                                year=acs_version,
+                                refresh=refresh,
+                                remove_water=FALSE)
+    census_tracts <- do.call(rbind, all_census_tracts)
+    
+    census_tracts$gisjoin <- paste0("G",paste(census_tracts$STATEFP,
+                                              census_tracts$COUNTYFP,
+                                              census_tracts$TRACTCE,
+                                              sep="0"))
+    # save multipolygon
+    st_write(census_tracts, tract_file_name, delete_dsn = TRUE)
+  }
+  if(return_files){
+    return(st_read(tract_file_name))
+  }
+}
+
 paper_methods <- function(states="all",
                           acs_version=2018,
                           energy_burden_poverty_line=0.06,
@@ -193,26 +230,12 @@ paper_methods <- function(states="all",
     save_format <- "in_poverty"
   }
   
-  tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
-  if(!file.exists(tract_file_name)){
-    
-    tract_states <- states
-    if(tract_states=="all"){
-      tract_states <- list_all_states()
-    }
-    
-    all_census_tracts <- lapply(tract_states, get_tracts, 
-                                year=acs_version,
-                                refresh=refresh,
-                                remove_water=FALSE)
-    census_tracts <- do.call(rbind, all_census_tracts)
-    
-    census_tracts$gisjoin <- paste0("G",paste(census_tracts$STATEFP,
-                                              census_tracts$COUNTYFP,
-                                              census_tracts$TRACTCE,
-                                              sep="0"))
-    # save multipolygon
-    st_write(census_tracts, tract_file_name, delete_dsn = TRUE)
-  }
+  get_tract_shapefiles(
+    states=states,
+    acs_version=acs_version,
+    refresh=refresh,
+    return_files=FALSE
+  )
+  
   print("methods complete")
 }
