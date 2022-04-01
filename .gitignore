@@ -145,3 +145,5 @@ venv.bak/
 
 *.aux
 *.synctex.gz
+
+config.yml

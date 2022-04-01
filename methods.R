@@ -7,6 +7,7 @@ get_tract_shapefiles <- function(
   return_files=FALSE,
   all_from_list=NULL
 ){
+  dir.create("data")
   tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
   if(!file.exists(tract_file_name)){
     
@@ -216,6 +217,42 @@ paper_methods <- function(states="all",
 
       
       data$households <- ifelse(is.na(data$households),0,data$households)
+      
+      data$simplified_primary_heating_fuel <- as.factor(ifelse(data$primary_heating_fuel=="ELECTRICITY",
+                                                                         "Electricity", 
+                                                                         ifelse(data$primary_heating_fuel %in% 
+                                                                                  c("UTILITY GAS","BOTTLED GAS"),
+                                                                                "Gas",
+                                                                                ifelse(data$primary_heating_fuel=="SOLAR",
+                                                                                       "Solar",
+                                                                                       "Other"))))
+      
+      data$super_simplified_primary_heating_fuel <- 
+        as.factor(ifelse(data$primary_heating_fuel=="SOLAR",
+                         "Solar",
+                         "Other"))
+      
+      
+      data$all <- as.factor("all")
+      
+      data <- dplyr::left_join(data, replica_sup[c("geoid","company_ty","locale")], by=c("geoid"))
+      
+      data$simplified_utility_type <- ifelse(data$company_ty %in% c("Coop","DistCoop"),
+                                                       "Cooperatively Owned",
+                                                       ifelse(data$company_ty %in% c("Federal",
+                                                                                               "Muni",
+                                                                                               "State"),
+                                                              "Government Owned",
+                                                              ifelse(data$company_ty %in% 
+                                                                       c("Private","PSubdiv"),
+                                                                     "Privately Held",
+                                                                     ifelse(data$company_ty=="IOU",
+                                                                            "Publicly Held",
+                                                                            "Other")
+                                                              )
+                                                       ))
+      
+      data$simplified_locale <- sub(" .*", "", data$locale)
       
       
       clean_data <- data[

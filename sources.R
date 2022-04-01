@@ -7,3 +7,5 @@ source("lead_munging.R")
 source("shapefile_munging.R")
 source("egrid_munging.R")
 source("methods.R")
+
+source("comparison_table.R")

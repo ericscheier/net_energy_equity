@@ -1,0 +1,4 @@
+default:
+  census_api:
+    email: "[email you used to obtain the key]"
+    key: "[your api key obtained from http://api.census.gov/data/key_signup.html]"

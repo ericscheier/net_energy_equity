@@ -50,7 +50,7 @@ census_tracts_shp <- get_tract_shapefiles(
 tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
 
 # make this dynamic to most recent 
-version_path <- "net_energy_equity_final_review20211217200747_files"
+#version_path <- "net_energy_equity_final_review20211217200747_files"
 
 knitr::opts_chunk$set(echo=FALSE)
 ```
@@ -83,7 +83,7 @@ Household\ Net\ Energy\ Return\ (N_{h}) = \frac{G - S}{S}
 \[E_{B}^{*} = \frac{S}{G} = 6\%\ ;\ N_{h}^{*} \approx 16 \Rightarrow Household\ at\ Energy\ Poverty\ Line\]
 
 ```{r load-table-full, include=FALSE}
-print_table <- read_csv("comparison_table.csv")
+# print_table <- read_csv("comparison_table.csv")
 ```
 
 ```{r table-full, results="asis"}

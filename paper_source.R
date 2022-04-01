@@ -1,30 +1,30 @@
-income_metric <- "AMI" #"AMI" #"fpl15" #
-geographic_scope <- "Census Tracts" #statecitycounty
-
-version_text <- as.character(acs_version)
-if(acs_version==2016){
-  version_text <- "sh"
-}
-
-base_file_name <- tolower(paste(income_metric,
-                                geographic_scope,
-                                version_text,
-                                paste(states,collapse="_",sep=""), sep = "_"))
-
-clean_data_ami <- read_csv(paste0("data/very_clean_data_",base_file_name,".csv"), guess_max = 10^6)
-
-income_metric <- "FPL"
-base_file_name <- tolower(paste(income_metric,
-                                geographic_scope,
-                                version_text,
-                                paste(states,collapse="_",sep=""), sep = "_"))
-clean_data_fpl <- read_csv(paste0("data/very_clean_data_",base_file_name,".csv"), guess_max = 10^6)
-
-tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
-
-census_tracts_shp <- st_read(tract_file_name)
-replica_sup <- get_replica_supplemental_dataset()
-tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
+# income_metric <- "AMI" #"AMI" #"fpl15" #
+# geographic_scope <- "Census Tracts" #statecitycounty
+# 
+# version_text <- as.character(acs_version)
+# if(acs_version==2016){
+#   version_text <- "sh"
+# }
+# 
+# base_file_name <- tolower(paste(income_metric,
+#                                 geographic_scope,
+#                                 version_text,
+#                                 paste(states,collapse="_",sep=""), sep = "_"))
+# 
+# clean_data_ami <- read_csv(paste0("data/very_clean_data_",base_file_name,".csv"), guess_max = 10^6)
+# 
+# income_metric <- "FPL"
+# base_file_name <- tolower(paste(income_metric,
+#                                 geographic_scope,
+#                                 version_text,
+#                                 paste(states,collapse="_",sep=""), sep = "_"))
+# clean_data_fpl <- read_csv(paste0("data/very_clean_data_",base_file_name,".csv"), guess_max = 10^6)
+# 
+# tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
+# 
+# census_tracts_shp <- st_read(tract_file_name)
+# replica_sup <- get_replica_supplemental_dataset()
+# tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
 
 # poverty-lines
 

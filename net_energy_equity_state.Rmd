@@ -110,7 +110,7 @@ options(knitr.table.format = function() {
 edit_color = "black" #"red" #"black
 strike_show = "hide" #"show" #"hide"
 hide = "FALSE" #"TRUE" #
-highlight = "FALSE" #"TRUE" #"FALSE"
+highlight = "TRUE" #"TRUE" #"FALSE"
 ```
 
 ```{r option-view, include=FALSE}
@@ -142,7 +142,17 @@ energy_burden_poverty_line <- 0.06
 # geographic_scope <- "tract" #statecitycounty
 ```
 
-```{r run-methods, cache=TRUE}
+```{r auth}
+tidycensus::census_api_key(
+  key = config::get("census_api")$key,
+  overwrite = TRUE, 
+  install = FALSE
+)
+# readRenviron("~/.Renviron")
+```
+
+
+```{r run-methods, cache=TRUE, eval=FALSE}
 paper_methods(states=states,
               acs_version=acs_version,
               energy_burden_poverty_line=energy_burden_poverty_line,
@@ -151,7 +161,28 @@ paper_methods(states=states,
 
 
 ```{r preprocessing}
+
+clean_data_ami <- read_csv("CohortData_AreaMedianIncome.csv")
+clean_data_fpl <- read_csv("CohortData_FederalPovertyLine.csv")
+replica_sup <- read_csv("CensusTractData.csv") #get_replica_supplemental_dataset()
+
+# this is where geospatial and other filtering should happen
+
+## define territory 
+## define zoom scope/area - if NULL, use the most populous scale below the territory scale (e.g. largest city in the county)
+
 source("paper_source.R")
+# tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
+
+census_tracts_shp <- get_tract_shapefiles(
+    states=states,
+    acs_version=acs_version,
+    refresh=refresh,
+    return_files=TRUE,
+    all_from_list=unique(replica_sup$state_abbr)
+  )
+
+tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
 ```
 
 ```{r}
@@ -165,130 +196,30 @@ source("paper_source.R")
 
 \newpage
 
-**Abstract: [Energy inequity is an issue of increasing urgency. Few policy-relevant datasets evaluate the energy burden of typical American households. Here, we develop a framework using Net Energy Analysis and household socioeconomic data to measure systematic energy inequity among critical groups that need policy attention. We find substantial instances of energy poverty in the United States -- `r scales::percent(energy_poverty_rate, accuracy=1)` of households experience energy poverty as presently defined as spending more than `r to_percent(energy_burden_poverty_line)` of household income on energy expenditures and more than `r ifelse(number_in_poverty[1]>10^6,to_million(number_in_poverty[1]),to_big(number_in_poverty[1]))` households above the Federal Poverty Line face energy poverty, disproportionately burdening Black, Hispanic, and Native American communities. For solar, wind, and energy efficiency to address socioeconomic mobility, programs must reduce energy expenditures by expanding eligibility requirements for support and access to improved conservation measures, efficiency upgrades, and distributed renewables. We recommend the United States develop a more inclusive federal energy poverty categorization that increases assistance for household energy costs.]{highlight=`r highlight`}**
+**Abstract: In [the United States]{highlight=`r highlight`} -- `r scales::percent(energy_poverty_rate, accuracy=1)` of households experience energy poverty as presently defined as spending more than `r to_percent(energy_burden_poverty_line)` of household income on energy expenditures and more than `r ifelse(number_in_poverty[1]>10^6,to_million(number_in_poverty[1]),to_big(number_in_poverty[1]))` households above the Federal Poverty Line face energy poverty. Households in energy poverty are disproportionately located in primarily [Black, Hispanic, and Native American] communities.]{highlight=`r highlight`}**
 
 ## [Introduction]{highlight=`r highlight`}
 
-Household energy use for services such as cooking[@mobarakLowDemandNontraditional2012] or space heating and cooling[@limaReviewRelationHousehold2020] is crucial for decent living conditions[@raoEnergyRequirementsDecent2019]. Unaffordable energy is a persistent trend[@brownPersistenceHighEnergy2020] that is negatively related to social cohesion, climate change responses, and disproportionate environmental impacts on low-income populations and minority groups [@carleyJusticeEquityImplications2020]. [Furthermore, e]{color=`r edit_color`}nergy inequity is not just a lack of money to meet basic energy needs - it is a lack of [access to the capabilities[@dayConceptualisingEnergyUse2016] that]{color=`r edit_color`} enable a sustainable and prosperous society built on just principles[[@sovacoolEnergyJusticeConceptual2015]]{color=`r edit_color`}. Energy inequity could have significant implications for navigating sustainable development and meeting societal goals around decarbonization and energy use. [In this study, we demonstrate the magnitude of energy inequity in the United States (US) using a metric informed by Net Energy Analysis (NEA). Without a set of inclusive indicators and data tools to examine energy inequity, many households that are at risk of energy poverty and injustice may remain unidentified. This analysis applies lessons from NEA to address energy poverty in the US.]{color=`r edit_color`}
+\[G = Gross\ Income\ ;\ S = Spending\ on\ Energy\]
+\[
+Energy\ Burden\ (E_{b})= \frac{S}{G}
+\]
+\[
+Household\ Net\ Energy\ Return\ (N_{h}) = \frac{G - S}{S}
+\]
+\[E_{B}^{*} = \frac{S}{G} = 6\%\ ;\ N_{h}^{*} \approx 16 \Rightarrow Household\ at\ Energy\ Poverty\ Line\]
 
-[Many frameworks are currently being explored to understand energy poverty and equity, while differentiating between related concepts. In a thematic exploration of energy equity, Brown et al. identify energy access, energy poverty, energy insecurity, and energy burden as key concepts for understanding the issue[@brownLowincomeEnergyAffordability2020], but quantitative measurement of these concepts has been limited. Pachauri & Rao establish measures for the sustainable development context that incorporate periods when energy is available, the quality of voltage supplied, the reliability in terms of the number of disruptions, the capacity in terms of power available, the consumption levels allowed per day, and affordability of the standard consumption package as a percentage of household income[@pachauriAdvancingEnergyPoverty2020]. Energy metrics have been assessed quantitatively across several countries. Though some aspects, such as formal disconnections from energy service[@graffWhichHouseholdsAre2021], are translatable to the US context, these methods require normalizing many variables amongst different types of data and are overly broad for applications in areas where electricity access is relatively high and reliable.]{color=`r edit_color`}
-
-[Of such areas, the United Kingdom (UK) has a richer history of incorporating energy poverty formally into its government programs: since 2000, the UK has used some form of an energy burden metric to assess whether households are facing energy poverty and determine the level of support that they require as a result[@bednarRecognitionResponseEnergy2020]. This metric has evolved from a simple ratio of household income and energy expenditures to one that incorporates building efficiency ratings and average incomes in the community. While the European Union (EU) currently lacks a unified metric for energy poverty, similar metrics have been developed in member countries, such as a metric which compares incomes and expenditures to local averages and absolute heating needs to determine energy poverty levels in Italy[@faiellaEnergyPovertyHow2021] or a multidimensional index of building quality and ability to pay bills in Poland[@sokolowskiMultidimensionalIndexMeasure2020].]{color=`r edit_color`}
-
-Prior research of household prosperity in limited global jurisdictions [using these sorts of measures]{color=`r edit_color`} has found that gender, age, housing age[@rossHighCostEnergy2018], tenure type[@mayerTwoFacesEnergy2014], energy inefficiency[@drehoblUSLowIncomeEnergy2016], education, employment[@linAffordabilityAccessFocus2018], geography[@linDoesEnergyPoverty2020], socioeconomic status[@bednarIntersectionEnergyJustice2017], race/ethnicity[@tongMeasuringSocialEquity2021], and macroeconomic conditions[@kawaiSpendingHouseholdEnergy2021] are associated with high energy burdens in various geographical areas. [The US lags in part due to a lack of metrics and tracking, and this paper develops a tool to show how net energy is a valuable resource to evaluate energy burden and inequality.]{color=`r edit_color`}
-
-In the US, energy inequity is a significant challenge as families struggle to meet monthly bills and live paycheck to paycheck[@bednarRecognitionResponseEnergy2020]. There is a growing disparity between wealthier and lower-income households based on their abilities to meet basic energy needs[@brownLowincomeEnergyAffordability2020]. While per-unit residential energy prices have increased below the rate of inflation in the [US]{color=`r edit_color`} since the 1980s[@unitedstatesenergyinformationadministrationShortTermEnergyOutlook2021], many households still struggle to make utility bill payments and are especially vulnerable to economic shocks[@kawaiSpendingHouseholdEnergy2021].
-
-[Ross and Drehobl performed distinct urban[@drehoblUSLowIncomeEnergy2016] and rural[@rossHighCostEnergy2018] analyses to describe energy inequity in the US. While limited by geographic and demographic focus and a lack of peer-review, these studies have established the proportion of income (*G*) spent on energy expenditures (*S*), or energy burden (*E~b~*), as the standard benchmark for energy poverty in the US today (Equation 1).]{color=`r edit_color`} [The US Department of Energy (DOE) significantly improved upon Ross and Drehobl's underlying methodology by assembling its Low-Income Energy Affordability Dataset (LEAD)[@maLowIncomeEnergyAffordability2019], which estimates incomes and energy expenditures for most households in the US at a census tract scale.]{color=`r edit_color`}
+Studies have established the proportion of income (*G*) spent on energy expenditures (*S*), or energy burden (*E~b~*), as the standard benchmark for energy poverty in the US today (Equation 1).
 
 \begin{align}
 Energy\ Burden\ (E_{b})= \frac{S}{G}
 \end{align}
-
-[[Therefore, stakeholders relying solely on energy burden have limited knowledge of which historical interventions have effectively promoted the energy system's success and a limited ability to design new interventions to promote community growth and address inequity in the energy system. ]{strike=`r strike_show`}]{color=`r edit_color`}NEA offers potential support to understanding energy equity through the use of formally defined Energy Return Ratios (ERRs) like *E~b~* that articulate the relationships among energy flows within complex systems[[[@carbajales-daleBetterCurrencyInvesting2014]. The properties of numerous metrics have been explored through this lens to date]{strike=`r strike_show`}]{color=`r edit_color`}[@brandtGeneralMathematicalFramework2011]. Net Energy Return (NER), which describes the newly released potential to do work as a result of some activity, is recommended as a basis for future analysis[@carbajales-daleBetterCurrencyInvesting2014], especially in the study of macro-energy systems like the US residential housing stock[@leviMacroEnergySystemsNew2019]. [[Treating the income remaining after energy expenditures (i.e., net income) as the focus of analysis to avoid the double-counting of energy expenditures, and portray net income as a result of energy consumption rather than a cause.]{strike=`r strike_show`}]{color="red"}
-
-Here, we examine the relationship between energy spending and household energy income and observe spatial disparities across a census-tract scale—particularly across race and ethnicity, income, housing tenure, and educational attainment. A difference of $500 in annual energy expenditures dramatically improves many middle and high-income households’ ability to enjoy benefits from energy services for low cost (2-5% of annual income), but basic energy expenditures comprise approximately 14% of annual earnings for low-income households. The categorizations for federal assistance programs that are based on poverty line indices fail to capture at least 5.3 million households that would benefit from energy support and assistance. Households in communities of color experience energy poverty at a rate 60% greater than those in white communities based on this study. Additionally, state-level analysis demonstrates wider spatial disparities across states such as Maine, where residential heating oil and fuelwood remain common heat energy sources and states such as Alabama and Mississippi which have among the lowest net energy returns on average. This empirical analysis fills a gap in the current discussion about energy equity by providing a framework to evaluate disparities and include more households in energy poverty metrics that are aligned with the assessment of energy flows through biological, physical, and economic systems.
-
-## [Results]{highlight=`r highlight`}
-
-#### Applying Net Energy Return to Energy Equity  {#ratios}
-
-```{r metric-comparison-data}
-eb_chart_data <- grouped_weighted_metrics(clean_data_fpl %>% 
-                                            mutate(energy_burden = round(100*energy_burden,digits=1)),
-                                          group_columns = c("energy_burden","income_bracket"), 
-                                          metric_name="net_income", 
-                                          metric_cutoff_level = energy_burden_poverty_line) %>% 
-  mutate(metric_name="Energy Burden (%)") %>% 
-  rename(energy_metric=energy_burden) #%>% 
-  # mutate(energy_metric=100*energy_metric)
-
-ner_chart_data <- grouped_weighted_metrics(clean_data_fpl %>% mutate(ner = round(ner,digits=0)), 
-                                     group_columns = c("ner","income_bracket"), 
-                                     metric_name="net_income", 
-                                     metric_cutoff_level = ner_poverty_line) %>% 
-  mutate(metric_name="Net Energy Return ($/$)") %>% rename(energy_metric=ner)
-
-comparison_chart_data <- rbind(eb_chart_data,ner_chart_data)
-
-metric_comparison_net_income_lbound <- -1000
-metric_comparison_net_income_ubound <- 6*10^4
-metric_comparison_x_axis_lbound <- -10
-metric_comparison_x_axis_ubound <- 400
-metric_comparison_pct <- sum(comparison_chart_data$household_count[
-  comparison_chart_data$energy_metric <= metric_comparison_x_axis_ubound & 
-    comparison_chart_data$energy_metric >= metric_comparison_x_axis_lbound & 
-    comparison_chart_data$metric_mean <= metric_comparison_net_income_ubound & 
-    comparison_chart_data$metric_mean >= metric_comparison_net_income_lbound & 
-    !is.na(comparison_chart_data$metric_mean) & 
-    is.finite(comparison_chart_data$metric_mean)]) / 
-  sum(comparison_chart_data$household_count)
-
-comparison_chart <- comparison_chart_data %>% 
-  ggplot(aes(x=energy_metric, y=metric_mean, fill=income_bracket, color=income_bracket)) +
-  # scale_x_continuous(trans=scales::pseudo_log_trans(base = 10)) +
-  scale_y_continuous(labels=scales::dollar_format()) + 
-  ggrastr::rasterise(geom_point(aes(size=household_count), 
-                                alpha=0.25, 
-                                position="jitter")) + 
-  scale_fill_discrete(name="Income Bracket") + 
-  scale_color_discrete(name="Income Bracket") + 
-  scale_size_continuous(name="Households", labels=scales::label_comma()) + 
-  # geom_hline(yintercept = .1) + 
-  # geom_vline(xintercept = 9) + 
-  # geom_smooth(method="lm",#NULL,#
-  #             mapping=aes(weight=household_count),
-  #             # formula=y~,
-  #             se=FALSE,
-  #             fullrange=TRUE,
-  #             linetype="solid",
-  #             alpha=0.75
-  #             ) + 
-  facet_grid(cols=vars(metric_name), switch="x", scales="free_x") +#, space="free_x") + 
-  theme_bw() +
-  labs(title = "Energy Burden and Net Energy Return in United States Households", 
-       x="Energy Metric", 
-       y="Household Annual Net Income ($)") + 
-  theme(legend.position = c(.3,.6),
-        legend.background = element_rect(fill = "#ffffffaa", colour = NA), 
-        legend.key.size = unit(10, "points")#,
-        # legend.justification = c(0, 0)
-        )+
-  coord_cartesian(#xlim=c(0,120),
-               ylim=c(metric_comparison_net_income_lbound,
-                      metric_comparison_net_income_ubound),
-               xlim=c(metric_comparison_x_axis_lbound,
-                      metric_comparison_x_axis_ubound),
-               # default=FALSE,
-               expand=TRUE)
-```
-
-[The main contribution of the study is the application of NER as an indicator of household energy poverty by utilizing a set of energy burden metrics based on NER to represent the disparity across those who face significant energy burdens in the US with those who do not. NER displays critical thresholds where more households face energy and income challenges.]{highlight=`r highlight`}
-
-The [NER]{color=`r edit_color`} of a process is a relationship between the gross amount of energy extracted and the amount of embodied energy directed toward extraction[@brandtCalculatingSystemsscaleEnergy2013]. [For households extracting income from the economy, these ratios can be composed of gross income (*G*) and spending on energy (*S*)]{color=`r edit_color`}.
 
 [Household NER (*N~h~*)]{color=`r edit_color`} represents the net earnings a household receives for every expenditure on secondary energy, defined according to Equation 2.
 
 \begin{align}
 Household\ Net\ Energy\ Return\ (N_{h}) = \frac{G - S}{S}
 \end{align}
-
-The NER is the standard metric of NEA because it reflects the role of energy as an input to a value-generating process in ecosystems[@brandtHowDoesEnergy2017]. *E~b~* is the metric of choice in the energy insecurity literature due to its [presumed]{color=`r edit_color`} interpretability as a percentage[@rossHighCostEnergy2018]^,^ [@bednarIntersectionEnergyJustice2017]^,^ [@drehoblUSLowIncomeEnergy2016]^,^ [@kawaiSpendingHouseholdEnergy2021]
-
-While most [ERRs]{color=`r edit_color`}, including NER, are hyperbolic paraboloids, NER has several useful mathematical properties: it can smoothly handle systems with negative incomes and energy costs, accept households with zero income, and emphasize extreme incomes and energy costs in an interpretable fashion, as shown in Figure \@ref(fig:metric-comparison). [While *E~b~* appears inversely correlated to income, this is primarily driven by a long tail of households with zero or very low incomes, often with energy expenditures exceeding their incomes (approximately n=`r to_big(round(clean_data_fpl$households[clean_data_fpl$net_income<0] %>% sum(),-3))` households in the dataset have *E~b~*>100% or *E~b~*<0%). Due to the structure of the *E~b~* equation (Equation 1), the *E~b~* of these households approaches infinity and cannot be captured on the standard 0-100% scale the metric is intended to be interpreted within: around `r to_big(round(clean_data_fpl$households[!is.finite(clean_data_fpl$energy_burden)] %>% sum(),-3))` homes have an infinite energy burden. Since LEAD is estimated and provided for the express purpose of exploring low-income communities, we are hesitant to discard these households as outliers. *N~h~* provides a framing of the same dataset that allows for exploration of most households on a similar scale without the long tail. *N~h~* appears positively related to income, and most communities appear within a few orders of magnitude. Utilizing *N~h~* avoids discarding low-income communities as outliers in energy poverty analysis. Furthermore, *N~h~* offers a way to view the relationship between energy expenditures and income such that the wide disparity between those in broader poverty is immediately apparent. Many households with moderate-to-high *E~b~*s are actually higher-income households with high energy expenditures, making their *N~h~*s quite high (e.g., >\$100 of income per \$1 of energy spending). Almost `r to_percent(metric_comparison_pct)` of the households in the dataset have net incomes between `r to_dollar(metric_comparison_net_income_lbound)` and `r to_dollar(metric_comparison_net_income_ubound)`, with *N~h~*s (or *E~b~*s) of between `r metric_comparison_x_axis_lbound` (`r to_percent(metric_comparison_x_axis_lbound/100)`) and `r metric_comparison_x_axis_ubound` (`r to_percent(metric_comparison_x_axis_ubound/100)`).]{color=`r edit_color`} Only households with no energy costs are excluded from the analysis, whereas households with no energy costs or incomes must be excluded from an analysis utilizing *E~b~*.
-
-(ref:metric-comparison-fig-cap) Display of the relationship between [*E~b~*]{color=`r edit_color`} and [*N~h~*]{color=`r edit_color`} with net income (gross income - energy expenditures) for US households. While [*E~b~*]{color=`r edit_color`} appears inversely correlated to net income, this is primarily driven by a long tail of households with zero or very low incomes, often with energy expenditures exceeding their incomes. Due to the structure of the [*E~b~*]{color=`r edit_color`} equation (Equation 1), the [*E~b~*]{color=`r edit_color`} of these households approaches infinity [and cannot be captured on the standard 0-100% scale the metric is intended to be interpreted within]{color=`r edit_color`}. Since LEAD is estimated and provided for the express purpose of exploring low-income communities, we are hesitant to discard these households as outliers. [*N~h~*]{color=`r edit_color`} frames the same dataset on a scale without the long tail. [*N~h~*]{color=`r edit_color`} appears positively related to income, and most communities appear within a few orders of magnitude. Utilizing [*N~h~*]{color=`r edit_color`} avoids discarding low-income communities as outliers in energy poverty analysis. Furthermore, [*N~h~*]{color=`r edit_color`} offers a way to view the relationship between energy expenditures and income such that the wide disparity between those in broader poverty is immediately apparent: many households with moderate-to-high *E~b~*s are actually higher-income households with high energy expenditures, making their [*N~h~*]{color=`r edit_color`}s quite high (e.g., >\$100 of income per \$1 of energy spending)[, which is only visible on an *N~h~* scale]{color=`r edit_color`}.
-
-```{r metric-comparison, include=TRUE, results='asis', fig.cap='(ref:metric-comparison-fig-cap)', fig.width=8.0,fig.height=5.5}
-metric_comparison_fig_cap_old <- paste0("Display of the relationship between ",colorize("*E~b~*",edit_color)," and ",colorize("*N~h~*",edit_color)," with net income (gross income - energy expenditures) for US households. While *E~b~* appears inversely correlated to net income, this is primarily driven by a long tail of households with zero or very low incomes, often with energy expenditures exceeding their incomes. Due to the structure of the *E~b~* equation (Equation 1), the *E~b~* of these households approaches infinity ",colorize("and cannot be captured on the standard 0-100\\% scale the metric is intended to be interpreted within",edit_color),". Since LEAD is estimated and provided for the express purpose of exploring low-income communities, we are hesitant to discard these households as outliers. *N~h~* frames the same dataset on a scale without the long tail. *N~h~* appears positively related to income, and most communities appear within a few orders of magnitude. Utilizing *N~h~* avoids discarding low-income communities as outliers in energy poverty analysis. Furthermore, *N~h~* offers a way to view the relationship between energy expenditures and income such that the wide disparity between those in broader poverty is immediately apparent: many households with moderate-to-high *E~b~*s are actually higher-income households with high energy expenditures, making their *N~h~*s quite high (e.g., >\\$100 of income per \\$1 of energy spending)",colorize(", which is only visible on an *N~h~* scale",edit_color),".")
-
-comparison_chart
-```
-
-For the discussion of household energy poverty, we are primarily interested in how households of different characteristics are distributed according to their [*N~h~*]{color=`r edit_color`}s, representing how many net dollars are earned by a household for every dollar it spends on energy. Since the *N~h~* is unitless but is a ratio of return on investment, we present it below interchangeably with no units or in units of $\$/\$$ depending on context. Other proposed indicators of energy poverty may be similarly examined in this manner. 
-
-
-#### Application to Energy Poverty  {#poverty-line}
 
 [While a variety of thresholds have been developed and explored, energy-poor households in the US are]{color=`r edit_color`} commonly defined in terms of *E~b~* as [those with]{color=`r edit_color`} an expenditure of greater than [`r to_percent(energy_burden_poverty_line)`]{color=`r edit_color`} of household income on energy [based on the logic that energy expenditures should not be greater than 20% of housing expenses, which themselves should not exceed 30% of household income[@brownLowincomeEnergyAffordability2020]]{color=`r edit_color`}. Calibrating our [*N~h~*]{color=`r edit_color`} analysis to this level will help gauge different thresholds of energy poverty and benchmark the results of this paper to the energy poverty literature while acknowledging the continuum of experiences across household energy consumption. Translated into its relative level for [*N~h~*]{color=`r edit_color`}, the energy poverty line *N~h~* is defined according to Equation 3 as `r ifelse(ner_poverty_line==round(ner_poverty_line),"","approximately")` `r round(ner_poverty_line,0)`.
 
@@ -300,118 +231,30 @@ N_{h}^{*} = \frac{G-S}{S}\ such\ that \ \frac{S}{G} = `r colorize(100*energy_bur
 
 This means that a household that earns less than [`r ifelse(ner_poverty_line==round(ner_poverty_line),"","approximately")` `r to_dollar(ner_poverty_line)`]{color=`r edit_color`} of income for every dollar it spends on secondary energy will be considered to be in energy poverty by the traditional *E~b~* accounting method. An *N~h~* of [`r ifelse(ner_poverty_line==round(ner_poverty_line),"","approximately")` `r round(ner_poverty_line,0)`]{color=`r edit_color`} or lower is equivalent to an *E~b~* of [`r to_percent(energy_burden_poverty_line)`]{color=`r edit_color`} or higher. This threshold is arbitrary and may not be suitable in situations where households fall very close to this line or where the numbers of family members or measures of certain building characteristics vary widely. Simply, it is presented as a benchmark. We examine the [*N~h~*]{color=`r edit_color`} at a community scale across the [US]{color=`r edit_color`} in Table \@ref(tab:comparison-table).
 
+[Here, we examine the relationship between energy spending and household energy income and observe spatial disparities across a census-tract scale—particularly across race and ethnicity, income, housing tenure, and educational attainment. A difference of $500 in annual energy expenditures dramatically improves many middle and high-income households’ ability to enjoy benefits from energy services for low cost (2-5% of annual income), but basic energy expenditures comprise approximately 14% of annual earnings for low-income households. The categorizations for federal assistance programs that are based on poverty line indices fail to capture at least 5.3 million households that would benefit from energy support and assistance. Households in communities of color experience energy poverty at a rate 60% greater than those in white communities based on this study. Additionally, state-level analysis demonstrates wider spatial disparities across states such as Maine, where residential heating oil and fuelwood remain common heat energy sources and states such as Alabama and Mississippi which have among the lowest net energy returns on average. This empirical analysis fills a gap in the current discussion about energy equity by providing a framework to evaluate disparities and include more households in energy poverty metrics that are aligned with the assessment of energy flows through biological, physical, and economic systems.]{highlight=`r highlight`}
 
-#### The US Household Net Energy Landscape  {#landscape}
+## [Results]{highlight=`r highlight`}
+
+For the discussion of household energy poverty, we are primarily interested in how households of different characteristics are distributed according to their [*N~h~*]{color=`r edit_color`}s, representing how many net dollars are earned by a household for every dollar it spends on energy. Since the *N~h~* is unitless but is a ratio of return on investment, we present it below interchangeably with no units or in units of $\$/\$$ depending on context. Other proposed indicators of energy poverty may be similarly examined in this manner. 
+
+
+#### Application to Energy Poverty  {#poverty-line}
+
+
+
+
+#### The Energy Poverty Landscape for [Territory] {#landscape}
 
 
 ```{r comparison-table-math}
 # table with states'/groups' median annual household energy expenditures, incomes, net incomes, *N~h~*, and *E~b~*
-compare_metrics <- function(metric_name="ner",
-                            dataset=NULL
-                            ){
-  gwm <- calculate_weighted_metrics(filter_graph_data(dataset,c("income_bracket"),metric_name),
-                           c("income_bracket"),
-                           metric_name,
-                           metric_cutoff_level=0,
-                           upper_quantile_view = 1,
-                           lower_quantile_view=0)
-  gwm$metric_name <- metric_name
-  return(gwm)
-}
-
-create_comparison_table <- function(
-    metrics_to_compare=c("income",
-                         "energy_cost",
-                         # "energy_burden",
-                         "net_income"#,
-                         # "ner"
-                                    ),
-    dataset=NULL,
-    include_totals=TRUE
-){
-  minimum_metrics_to_compare <- c("income","energy_cost","net_income")
-  
-  metrics_to_compare <- unique(c(metrics_to_compare,minimum_metrics_to_compare))
-  
-  compare_table <- data.table::rbindlist(lapply(metrics_to_compare, 
-                                                compare_metrics,
-                                      dataset=clean_data_ami))
-  
-  
-  compare_table <- compare_table %>% 
-    pivot_wider(id_cols=income_bracket,
-                names_from=metric_name,
-                values_from=metric_mean) %>% 
-    mutate(energy_burden = energy_burden_func(g=income, s=energy_cost),
-           ner = ner_func(g=income, s=energy_cost)) %>% 
-    pivot_longer(cols=unique(c("income","energy_cost","energy_burden","net_income","ner"), 
-                             minimum_metrics_to_compare))
-  
-  if(include_totals){
-    compare_table_totals <- compare_table %>% 
-    filter(metric_name=="income") %>% 
-    pivot_wider(id_cols=income_bracket,
-                names_from=metric_name,
-                values_from=household_count,
-                ) %>% 
-    rename(households=income) %>% pivot_longer(cols="households")
-    
-    compare_table <- rbind(compare_table_totals, compare_table)
-  }
-  
-  #format the metrics accordingly
-  # income = 0 decimal place $
-  # energy_cost = 0 decimal place $
-  # energy_burden = 0 decimal place %
-  # net_income = 0 decimal place $
-  # ner = 1 decimal place number
-  
-  which_metric <- "value" #"metric_mean" #"metric_median"
-  
-  compare_table$print_value <- ifelse(compare_table$name %in% c("income",
-                                                                       "energy_cost",
-                                                                       "net_income"),
-                                      to_dollar(compare_table[[which_metric]],latex=TRUE),
-                                      ifelse(compare_table$name %in% c("energy_burden"),
-                                             to_percent(compare_table[[which_metric]],latex=TRUE),
-                                             ifelse(compare_table$name %in% c("ner"),
-                                                    round(compare_table[[which_metric]],1),
-                                                    ifelse(compare_table$name %in% c("households"),
-                                                           to_million(compare_table[[which_metric]]),
-                                                    to_big(compare_table[[which_metric]])))))
-  
-  compare_table$display_income_bracket <- dplyr::recode_factor(compare_table$income_bracket, 
-                                         very_low="0-30\\% AMI",
-                                         low_mod="30-80\\% AMI", 
-                                         mid_high="Above 80\\% AMI",
-                                         All="All",
-                                         .ordered=TRUE)
-  
-  energy_burden_label <- "\\textit{E\\textsubscript{b}} (\\textit{S}/\\textit{G})" #if html etc. <- "*E~b~* (S/G)"
-  ner_label <- "\\textit{N\\textsubscript{h}} ([\\textit{G}-\\textit{S}]/\\textit{S})" #if html etc. <- "*N~h~* ([G-S]/S)"
-  
-  compare_table[,"Metric Name"] <- dplyr::recode(compare_table$name,
-                                                 households="Households in Sample",
-                                      income="Annual Income (\\textit{G})",
-                                      energy_cost="Annual Energy Expenditures (\\textit{S})",
-                                      energy_burden=energy_burden_label,
-                                      net_income="Net Income (\\textit{G}-\\textit{S})",
-                                      ner=ner_label)
-  
-  print_table <- compare_table[,c("Metric Name","display_income_bracket","print_value")] %>% 
-    arrange(display_income_bracket) %>% 
-    pivot_wider(names_from=display_income_bracket,values_from=print_value)
-  
-  return(print_table)
-}
-
-print_table <- create_comparison_table <- function(
+compare_table <- create_comparison_table(
     metrics_to_compare=NULL,
-    dataset=NULL,
+    dataset=clean_data_ami,
     include_totals=TRUE
 )
   
-write_csv(print_table, "comparison_table.csv")
+#write_csv(print_table, "comparison_table.csv")
 
 highlight_metrics <- rbindlist(lapply(c(
                                     "energy_burden",
@@ -446,7 +289,8 @@ max_homes <- total_homes$estimate + total_homes$moe
 (ref:comparison-table-caption) Average annual household energy expenditures, incomes, net incomes, [*N~h~*]{color=`r edit_color`}s, and [*E~b~*]{color=`r edit_color`}s portrayed for different income groups based on their relationship to [AMI]{color=`r edit_color`}. Note that the statistics for [*E~b~*]{color=`r edit_color`} and [*N~h~*]{color=`r edit_color`} are calculated per cohort after averaging the income and expenditure statistics to avoid the effect of extreme values skewing the interpretability of these metrics as described in the text. For example, the actual weighted average [*E~b~*]{color=`r edit_color`} for households from 0-30% AMI is `r num_one`, and the average [*N~h~*]{color=`r edit_color`} for this cohort is `r num_two` due to subsets of the dataset with very low incomes or low energy expenditures. [*N~h~*]{color=`r edit_color`} is not as susceptible to this skewing effect.
 
 ```{r comparison-table, include=TRUE, results="asis"}
-final_table <- subset(print_table, select=-All) %>%  
+final_table <- subset(create_printable_comparison_table(compare_table), 
+                      subset=TRUE, select=-All) %>%  
   knitr::kable(booktabs=T,
                escape = F,
                caption='(ref:comparison-table-caption)') %>% 
@@ -474,24 +318,11 @@ final_table
 
 [Another contribution of this work is that by using *N~h~*, we can display these data spatially across the US to explore how different communities are experiencing energy outcomes as in Figure \@ref(fig:continental-map) and investigate specific communities at multiple scales such as census tract, county, state, and regional as in Figure \@ref(fig:inset-map). Furthermore, we can break down the data among meaningful subsets as in Figure \@ref(fig:density-charts) and examine state-by-state trends as in Figure \@ref(fig:state-violin). This is useful because the presence of energy inequity is harder to see in urban areas compared to rural areas for which census tracts are a larger physical area or when certain household characteristics such as primary heating fuel are related to widely differing energy outcomes in the same area. Additionally, it shows a spatial variation of energy poverty that includes `r to_million(number_in_poverty[1]+clean_data_fpl$households[clean_data_fpl$net_income<0] %>% sum())` more households that would not be captured by traditional poverty metrics because their incomes are too low (*E~b~*>100%) or too high (above the FPL). By processing disparate data sources into a coherent structure and providing a convenient open-source tool for others to do the same, these data can be used in urban planning, public policy, and other relevant contexts.]{color=`r edit_color`}
 
-Displayed geospatially in Figure \@ref(fig:continental-map), the Black Belt in the American Southeast is visibly perceptible [as an area of high burden]{color=`r edit_color`}, indicating that low-*N~h~* follows racial lines[[in areas where inexpensive energy is available, and burdens are more dependent on housing quality and patterns of consumption than they are dependent on price]{strike=`r strike_show`}]{color=`r edit_color`}. Likewise, border populations and immigrant populated areas in the Southwest have higher burdens, as do Native American lands. [[The use of heating oil in the Northeast states such as Maine can be seen through the prevalance of low-*N~h~* communities in this area since heating oil is a notably expensive and inefficient source of heating commonly used in this region]{strike=`r strike_show`} High burdens can also be seen in rural Northeast states where heating burdens are high]{color=`r edit_color`}. [*N~h~* allows a nuanced view of these widely ranging income dynamics by portraying them on a scale that matches the scope of the issues: areas of high energy burden (close to *N~h~*=0) are visible in orange while highly affluent areas are also visually perceptible as dark blue even though these groups' average metrics are multiple orders of magnitude apart.]{color=`r edit_color`}
+Displayed geospatially in Figure \@ref(fig:continental-map), [*N~h~* allows a nuanced view of widely ranging income dynamics by portraying them on a scale that matches the scope of the issues: areas of high energy burden (close to *N~h~*=0) are visible in orange while highly affluent areas are also visually perceptible as dark blue even though these groups' average metrics are multiple orders of magnitude apart.]{color=`r edit_color`}
 
 (ref:continental-map-fig-cap) Map of the average net earned income per secondary energy expenditure for each census tract in the continental [US]{color=`r edit_color`}. Shades of yellow and red[, respectively,]{color=`r edit_color`} indicate communities at or below the energy poverty line as defined by earning [`r ifelse(ner_poverty_line==round(ner_poverty_line),"","approximately ")` `r round(ner_poverty_line,0)`]{color=`r edit_color`} dollars or less in income per dollar of energy expenditures. This corresponds to the traditional definition of energy poverty as spending [`r to_percent(energy_burden_poverty_line)`]{color=`r edit_color`} or more of income on energy. Low [*N~h~*]{color=`r edit_color`}s can be starkly observed in the Black Belt across the Southeastern US, Hispanic communities near the US-Mexico border, Native American lands, and rural New England.
 
 ```{r continental-map, include=TRUE, results='asis', fig.cap='(ref:continental-map-fig-cap)', fig.width=8.0,fig.height=5.5}
-
-old_continental_map_fig_cap <- paste0("Map of the average net earned income per secondary energy expenditure for each census tract in the continental ",
-                                  colorize("US",edit_color),
-                                  ". Shades of yellow and red",
-                                  colorize(",respectively,",edit_color),
-                                  " indicate communities at or below the energy poverty line as defined by earning ",
-                                  ifelse(ner_poverty_line==round(ner_poverty_line),"","approximately "),
-                                  round(ner_poverty_line,0),
-                                  " dollars or less in income per dollar of energy expenditures. This corresponds to the traditional definition of energy poverty as spending ",
-                                  to_percent(energy_burden_poverty_line),
-                                  " or more of income on energy. Low ",
-                                  colorize("*N~h~*",edit_color),
-                                  "s can be starkly observed in the Black Belt across the Southeastern US, Hispanic communities near the US-Mexico border, Native American lands, and rural New England.")
 
 group_variable <- "geoid"# "GEOID" #"state_abbr" #merge_geo_id" #
 group_columns <- c(group_variable) #c("gisjoin") #
@@ -658,44 +489,6 @@ gg_inset_map_footnote <- gridExtra::grid.arrange(
 ```
 
 From this high level, we can see in Figure \@ref(fig:density-charts)[.a]{color=`r edit_color`} that approximately `r scales::percent(energy_poverty_rate, accuracy=1)` of households in the [US]{color=`r edit_color`} experience energy poverty. Displaying these communities defined by their relationship to the US Federal Poverty Line (FPL), which indicates income poverty status according to government policy, in [Figure \@ref(fig:density-charts).b]{color=`r edit_color`} provides a stark picture. While `r scales::percent(in_both_poverty, accuracy=1)` of households below the FPL also face energy poverty, [more than `r ifelse(number_in_poverty[1]>10^6,to_million(number_in_poverty[1]),to_big(number_in_poverty[1]))` of those households]{color=`r edit_color`} above the FPL face this scarcity, underscoring the relative burden of energy expenditures as a poverty trap [and the inadequacy of FPL as an indicator of energy poverty in particular]{color=`r edit_color`}. When we break the group of relatively prosperous households into subsets [as outlined in Table \@ref(tab:comparison-table)]{color=`r edit_color`}, we find that `r scales::percent(as.numeric(ami_top_metrics[ami_top_metrics$income_bracket=="low_mod","households_below_cutoff"])/as.numeric(ami_top_metrics[ami_top_metrics$income_bracket=="low_mod","household_count"]),accuracy=1)` of households living at 30-80% of their [AMI]{color=`r edit_color`} are experiencing energy poverty. This suggests that energy poverty may be a useful metric for identifying households at risk of other forms of poverty. However, we find that most households experiencing energy poverty are also suffering from a broader lack of access to resources characterized by income-based poverty. Given that the quality of energy used by low-income households is expected to be of similar inherent usefulness, this stark contrast in [*N~h~*]{color=`r edit_color`} on the households’ energy investments is surprising.
-
-```{r}
-clean_data_fpl$simplified_primary_heating_fuel <- as.factor(ifelse(clean_data_fpl$primary_heating_fuel=="ELECTRICITY",
-                                                              "Electricity", 
-                                                               ifelse(clean_data_fpl$primary_heating_fuel %in% 
-                                                                        c("UTILITY GAS","BOTTLED GAS"),
-                                                                      "Gas",
-                                                    ifelse(clean_data_fpl$primary_heating_fuel=="SOLAR",
-                                                           "Solar",
-                                                                      "Other"))))
-
-clean_data_fpl$super_simplified_primary_heating_fuel <- 
-  as.factor(ifelse(clean_data_fpl$primary_heating_fuel=="SOLAR",
-                                                           "Solar",
-                                                                      "Other"))
-
-
-clean_data_ami$all <- as.factor("all")
-
-clean_data_ami <- dplyr::left_join(clean_data_ami, replica_sup[c("geoid","company_ty","locale")], by=c("geoid"))
-
-clean_data_ami$simplified_utility_type <- ifelse(clean_data_ami$company_ty %in% c("Coop","DistCoop"),
-                                                 "Cooperatively Owned",
-                                                 ifelse(clean_data_ami$company_ty %in% c("Federal",
-                                                                                         "Muni",
-                                                                                         "State"),
-                                                        "Government Owned",
-                                                        ifelse(clean_data_ami$company_ty %in% 
-                                                                 c("Private","PSubdiv"),
-                                                               "Privately Held",
-                                                               ifelse(clean_data_ami$company_ty=="IOU",
-                                                                      "Publicly Held",
-                                                                      "Other")
-                                                               )
-                                                        ))
-
-clean_data_ami$simplified_locale <- sub(" .*", "", clean_data_ami$locale)
-```
 
 
 ```{r}
@@ -1311,6 +1104,94 @@ Creating a federal energy poverty line would be a critical step in identifying f
 
 ## Methods  {#methods}
 
+#### Why Net Energy?  {#ratios}
+
+```{r metric-comparison-data}
+eb_chart_data <- grouped_weighted_metrics(clean_data_fpl %>% 
+                                            mutate(energy_burden = round(100*energy_burden,digits=1)),
+                                          group_columns = c("energy_burden","income_bracket"), 
+                                          metric_name="net_income", 
+                                          metric_cutoff_level = energy_burden_poverty_line) %>% 
+  mutate(metric_name="Energy Burden (%)") %>% 
+  rename(energy_metric=energy_burden) #%>% 
+  # mutate(energy_metric=100*energy_metric)
+
+ner_chart_data <- grouped_weighted_metrics(clean_data_fpl %>% mutate(ner = round(ner,digits=0)), 
+                                     group_columns = c("ner","income_bracket"), 
+                                     metric_name="net_income", 
+                                     metric_cutoff_level = ner_poverty_line) %>% 
+  mutate(metric_name="Net Energy Return ($/$)") %>% rename(energy_metric=ner)
+
+comparison_chart_data <- rbind(eb_chart_data,ner_chart_data)
+
+metric_comparison_net_income_lbound <- -1000
+metric_comparison_net_income_ubound <- 6*10^4
+metric_comparison_x_axis_lbound <- -10
+metric_comparison_x_axis_ubound <- 400
+metric_comparison_pct <- sum(comparison_chart_data$household_count[
+  comparison_chart_data$energy_metric <= metric_comparison_x_axis_ubound & 
+    comparison_chart_data$energy_metric >= metric_comparison_x_axis_lbound & 
+    comparison_chart_data$metric_mean <= metric_comparison_net_income_ubound & 
+    comparison_chart_data$metric_mean >= metric_comparison_net_income_lbound & 
+    !is.na(comparison_chart_data$metric_mean) & 
+    is.finite(comparison_chart_data$metric_mean)]) / 
+  sum(comparison_chart_data$household_count)
+
+comparison_chart <- comparison_chart_data %>% 
+  ggplot(aes(x=energy_metric, y=metric_mean, fill=income_bracket, color=income_bracket)) +
+  # scale_x_continuous(trans=scales::pseudo_log_trans(base = 10)) +
+  scale_y_continuous(labels=scales::dollar_format()) + 
+  ggrastr::rasterise(geom_point(aes(size=household_count), 
+                                alpha=0.25, 
+                                position="jitter")) + 
+  scale_fill_discrete(name="Income Bracket") + 
+  scale_color_discrete(name="Income Bracket") + 
+  scale_size_continuous(name="Households", labels=scales::label_comma()) + 
+  # geom_hline(yintercept = .1) + 
+  # geom_vline(xintercept = 9) + 
+  # geom_smooth(method="lm",#NULL,#
+  #             mapping=aes(weight=household_count),
+  #             # formula=y~,
+  #             se=FALSE,
+  #             fullrange=TRUE,
+  #             linetype="solid",
+  #             alpha=0.75
+  #             ) + 
+  facet_grid(cols=vars(metric_name), switch="x", scales="free_x") +#, space="free_x") + 
+  theme_bw() +
+  labs(title = "Energy Burden and Net Energy Return in United States Households", 
+       x="Energy Metric", 
+       y="Household Annual Net Income ($)") + 
+  theme(legend.position = c(.3,.6),
+        legend.background = element_rect(fill = "#ffffffaa", colour = NA), 
+        legend.key.size = unit(10, "points")#,
+        # legend.justification = c(0, 0)
+        )+
+  coord_cartesian(#xlim=c(0,120),
+               ylim=c(metric_comparison_net_income_lbound,
+                      metric_comparison_net_income_ubound),
+               xlim=c(metric_comparison_x_axis_lbound,
+                      metric_comparison_x_axis_ubound),
+               # default=FALSE,
+               expand=TRUE)
+```
+
+[The main contribution of the study is the application of NER as an indicator of household energy poverty by utilizing a set of energy burden metrics based on NER to represent the disparity across those who face significant energy burdens in the US with those who do not. NER displays critical thresholds where more households face energy and income challenges.]{highlight=`r highlight`}
+
+The [NER]{color=`r edit_color`} of a process is a relationship between the gross amount of energy extracted and the amount of embodied energy directed toward extraction[@brandtCalculatingSystemsscaleEnergy2013]. [For households extracting income from the economy, these ratios can be composed of gross income (*G*) and spending on energy (*S*)]{color=`r edit_color`}.
+
+The NER is the standard metric of NEA because it reflects the role of energy as an input to a value-generating process in ecosystems[@brandtHowDoesEnergy2017]. *E~b~* is the metric of choice in the energy insecurity literature due to its [presumed]{color=`r edit_color`} interpretability as a percentage[@rossHighCostEnergy2018]^,^ [@bednarIntersectionEnergyJustice2017]^,^ [@drehoblUSLowIncomeEnergy2016]^,^ [@kawaiSpendingHouseholdEnergy2021]
+
+While most [ERRs]{color=`r edit_color`}, including NER, are hyperbolic paraboloids, NER has several useful mathematical properties: it can smoothly handle systems with negative incomes and energy costs, accept households with zero income, and emphasize extreme incomes and energy costs in an interpretable fashion, as shown in Figure \@ref(fig:metric-comparison). [While *E~b~* appears inversely correlated to income, this is primarily driven by a long tail of households with zero or very low incomes, often with energy expenditures exceeding their incomes (approximately n=`r to_big(round(clean_data_fpl$households[clean_data_fpl$net_income<0] %>% sum(),-3))` households in the dataset have *E~b~*>100% or *E~b~*<0%). Due to the structure of the *E~b~* equation (Equation 1), the *E~b~* of these households approaches infinity and cannot be captured on the standard 0-100% scale the metric is intended to be interpreted within: around `r to_big(round(clean_data_fpl$households[!is.finite(clean_data_fpl$energy_burden)] %>% sum(),-3))` homes have an infinite energy burden. Since LEAD is estimated and provided for the express purpose of exploring low-income communities, we are hesitant to discard these households as outliers. *N~h~* provides a framing of the same dataset that allows for exploration of most households on a similar scale without the long tail. *N~h~* appears positively related to income, and most communities appear within a few orders of magnitude. Utilizing *N~h~* avoids discarding low-income communities as outliers in energy poverty analysis. Furthermore, *N~h~* offers a way to view the relationship between energy expenditures and income such that the wide disparity between those in broader poverty is immediately apparent. Many households with moderate-to-high *E~b~*s are actually higher-income households with high energy expenditures, making their *N~h~*s quite high (e.g., >\$100 of income per \$1 of energy spending). Almost `r to_percent(metric_comparison_pct)` of the households in the dataset have net incomes between `r to_dollar(metric_comparison_net_income_lbound)` and `r to_dollar(metric_comparison_net_income_ubound)`, with *N~h~*s (or *E~b~*s) of between `r metric_comparison_x_axis_lbound` (`r to_percent(metric_comparison_x_axis_lbound/100)`) and `r metric_comparison_x_axis_ubound` (`r to_percent(metric_comparison_x_axis_ubound/100)`).]{color=`r edit_color`} Only households with no energy costs are excluded from the analysis, whereas households with no energy costs or incomes must be excluded from an analysis utilizing *E~b~*.
+
+(ref:metric-comparison-fig-cap) Display of the relationship between [*E~b~*]{color=`r edit_color`} and [*N~h~*]{color=`r edit_color`} with net income (gross income - energy expenditures) for US households. While [*E~b~*]{color=`r edit_color`} appears inversely correlated to net income, this is primarily driven by a long tail of households with zero or very low incomes, often with energy expenditures exceeding their incomes. Due to the structure of the [*E~b~*]{color=`r edit_color`} equation (Equation 1), the [*E~b~*]{color=`r edit_color`} of these households approaches infinity [and cannot be captured on the standard 0-100% scale the metric is intended to be interpreted within]{color=`r edit_color`}. Since LEAD is estimated and provided for the express purpose of exploring low-income communities, we are hesitant to discard these households as outliers. [*N~h~*]{color=`r edit_color`} frames the same dataset on a scale without the long tail. [*N~h~*]{color=`r edit_color`} appears positively related to income, and most communities appear within a few orders of magnitude. Utilizing [*N~h~*]{color=`r edit_color`} avoids discarding low-income communities as outliers in energy poverty analysis. Furthermore, [*N~h~*]{color=`r edit_color`} offers a way to view the relationship between energy expenditures and income such that the wide disparity between those in broader poverty is immediately apparent: many households with moderate-to-high *E~b~*s are actually higher-income households with high energy expenditures, making their [*N~h~*]{color=`r edit_color`}s quite high (e.g., >\$100 of income per \$1 of energy spending)[, which is only visible on an *N~h~* scale]{color=`r edit_color`}.
+
+```{r metric-comparison, include=TRUE, results='asis', fig.cap='(ref:metric-comparison-fig-cap)', fig.width=8.0,fig.height=5.5}
+metric_comparison_fig_cap_old <- paste0("Display of the relationship between ",colorize("*E~b~*",edit_color)," and ",colorize("*N~h~*",edit_color)," with net income (gross income - energy expenditures) for US households. While *E~b~* appears inversely correlated to net income, this is primarily driven by a long tail of households with zero or very low incomes, often with energy expenditures exceeding their incomes. Due to the structure of the *E~b~* equation (Equation 1), the *E~b~* of these households approaches infinity ",colorize("and cannot be captured on the standard 0-100\\% scale the metric is intended to be interpreted within",edit_color),". Since LEAD is estimated and provided for the express purpose of exploring low-income communities, we are hesitant to discard these households as outliers. *N~h~* frames the same dataset on a scale without the long tail. *N~h~* appears positively related to income, and most communities appear within a few orders of magnitude. Utilizing *N~h~* avoids discarding low-income communities as outliers in energy poverty analysis. Furthermore, *N~h~* offers a way to view the relationship between energy expenditures and income such that the wide disparity between those in broader poverty is immediately apparent: many households with moderate-to-high *E~b~*s are actually higher-income households with high energy expenditures, making their *N~h~*s quite high (e.g., >\\$100 of income per \\$1 of energy spending)",colorize(", which is only visible on an *N~h~* scale",edit_color),".")
+
+comparison_chart
+```
+
 #### Data  {#data}
 To estimate the Net Energy Return (*N~h~*) of American households, we primarily utilize the Low Income Energy Affordability Data (LEAD)[@maLowIncomeEnergyAffordability2019] and Rooftop Energy Potential of Low-Income Communities in America (REPLICA)[@sigrinRooftopSolarTechnical2018] datasets, which the DOE assembled to help “stakeholders make data-driven decisions on energy goal setting and program planning by providing them information on low-income household populations and associated energy use characteristics”[@maLowIncomeEnergyAffordability2019]. These datasets encompass estimates of household energy expenditures (*S*), income (*G*), and demographic characteristics for most households at the census tract scale in all states and most territories of the [US]{color=`r edit_color`}.  
 
@@ -1400,14 +1281,6 @@ All data necessary for the composition of the source datasets used in this analy
 ## Acknowledgements  {#acknowledgements}
 [The authors wish to thank Nikhil Kaza and Andy Yates for insightful conversations, review, comments, feedback, and advice on this study.]{highlight=`r highlight`}
 
-## Author Contributions  {#author-contributions}
-
-ES and NK conceived of and designed the project. ES created the software used for data acquisition and analysis and created the figures. NK contributed the introduction of the topic and interpretation of the results.
-
-## Competing Interests  {#competing-interests}
-
-The authors declare no competing interests.
-
 
 ```{r eval=FALSE}
 # 
@@ -1448,7 +1321,7 @@ Figure \@ref(fig:state-violin): (ref:state-violin-fig-cap)
 
 ```{r}
 # merge data together
-if(!is_preview){
+if(!is_preview==TRUE & refresh==TRUE){
   write.csv(x=clean_data_fpl,file="CohortData_FederalPovertyLine.csv")
   write.csv(x=clean_data_ami,file="CohortData_AreaMedianIncome.csv")
   write.csv(x=replica_sup,file="CensusTractData.csv")
