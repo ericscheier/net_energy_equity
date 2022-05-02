@@ -1,21 +1,16 @@
 ---
-title: A measurement strategy to address disparities across household energy burdens
+title: Energy Burden Report for Sonoma Clean Power
 subtitle: 
 titlerunning: Net Energy Equity
-authorrunning: Scheier & Kittner
+authorrunning: Eric Scheier
 # thanks:
 author:
  - Eric Scheier:
-     institute: [emergi, e3p]
- - name: Noah Kittner
-   email: kittner@unc.edu
-   institute: [e3p, gillings, planning]
-   correspondence: true
+     email: eric@scheier.org
+     institute: [emergi]
+     correspondence: true
 institute:
  - emergi: Emergi Foundation, Carrboro, NC, USA
- - e3p: Environment, Ecology, and Energy Program, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
- - gillings: Department of Environmental Sciences and Engineering, Gillings School of Global Public Health, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
- - planning: Department of City and Regional Planning, The University of North Carolina at Chapel Hill, Chapel Hill, NC, USA
 keywords:
   - energy burden
   - net energy
@@ -162,9 +157,29 @@ paper_methods(states=states,
 
 ```{r preprocessing}
 
-clean_data_ami <- read_csv("CohortData_AreaMedianIncome.csv")
-clean_data_fpl <- read_csv("CohortData_FederalPovertyLine.csv")
+clean_data_ami_all <- read_csv("CohortData_AreaMedianIncome.csv")
+clean_data_fpl_all <- read_csv("CohortData_FederalPovertyLine.csv")
 replica_sup <- read_csv("CensusTractData.csv") #get_replica_supplemental_dataset()
+
+clean_data_ami <- left_join(clean_data_ami_all, 
+                            replica_sup[,c("geoid","company_na","county_name")], 
+                            by=c("geoid")) %>%
+                                  filter(state_abbr=="CA", 
+                                         county_name %in% 
+                                           c("Sonoma County",
+                                             "Mendocino County"),
+                                         company_na=="Pacific Gas & Electric Co"
+                                         )
+
+clean_data_fpl <- left_join(clean_data_fpl_all, 
+                            replica_sup[,c("geoid","company_na","county_name")], 
+                            by=c("geo_id"="geoid")) %>%
+                                  filter(state_abbr=="CA", 
+                                         county_name %in% 
+                                           c("Sonoma County",
+                                             "Mendocino County"),
+                                         company_na=="Pacific Gas & Electric Co"
+                                         )
 
 # this is where geospatial and other filtering should happen
 
@@ -183,6 +198,17 @@ census_tracts_shp <- get_tract_shapefiles(
   )
 
 tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
+
+continental_shp <- tract_shp %>% filter(!(state_abbr %in% c("HI","AK", NA)))
+
+state_shp <- tract_shp %>% filter(state_abbr=="CA")
+
+territory_shp <- tract_shp %>% filter(state_abbr=="CA", 
+                                         county_name %in% 
+                                           c("Sonoma County",
+                                             "Mendocino County"),
+                                         company_na=="Pacific Gas & Electric Co"
+                                         )
 ```
 
 ```{r}
@@ -250,7 +276,7 @@ For the discussion of household energy poverty, we are primarily interested in h
 # table with states'/groups' median annual household energy expenditures, incomes, net incomes, *N~h~*, and *E~b~*
 compare_table <- create_comparison_table(
     metrics_to_compare=NULL,
-    dataset=clean_data_ami,
+    input_dataset=clean_data_ami,
     include_totals=TRUE
 )
   
@@ -260,7 +286,7 @@ highlight_metrics <- rbindlist(lapply(c(
                                     "energy_burden",
                                     "ner"
                                     ), compare_metrics,
-                                    dataset=clean_data_ami))
+                                    input_dataset=clean_data_ami))
 
 highlight_energy_burden <- as.numeric(highlight_metrics[metric_name=="energy_burden" & income_bracket=="very_low","metric_mean"])
 
@@ -326,15 +352,28 @@ Displayed geospatially in Figure \@ref(fig:continental-map), [*N~h~* allows a nu
 
 group_variable <- "geoid"# "GEOID" #"state_abbr" #merge_geo_id" #
 group_columns <- c(group_variable) #c("gisjoin") #
-graph_data <- filter_graph_data(clean_data_ami, group_columns, metric_name)
+graph_data <- filter_graph_data(clean_data_ami_all, group_columns, metric_name)
 
-continental_shp <- tract_shp %>% filter(!(state_abbr %in% c("HI","AK", NA)))
+
 # add utility cutout
 # utility_shp <- tract_shp %>% filter(company_na=="")
 
 # full_map_data <- left_join(tract_shp, gwm, by=c("geoid"))
 
-map_data <- left_join(continental_shp, gwm, by=c("geoid"))
+gwm <- calculate_weighted_metrics(filter_graph_data(clean_data_ami_all,
+                                                    c("geoid"),
+                                                    metric_name),
+                           c("geoid"),
+                           metric_name,
+                           metric_cutoff_level=0,
+                           upper_quantile_view = 1,
+                           lower_quantile_view=0)
+
+gwm$metric_name <- metric_name
+
+territory_map_data <- left_join(territory_shp, gwm, by=c("geoid"))
+state_map_data <- left_join(state_shp, gwm, by=c("geoid"))
+continental_map_data <- left_join(continental_shp, gwm, by=c("geoid"))
 
 clean_top_metrics <- grouped_weighted_metrics(graph_data %>% 
                                                 filter(!(state_abbr %in% c("HI","AK", NA))), 
@@ -353,7 +392,7 @@ choropleth_chart <- choropleth_map(
     metric_cutoff_label,
     upper_quantile_view,
     lower_quantile_view,
-    chart_title=paste0("Energy Burdens Across the United States"),
+    chart_title=paste0("Energy Burdens in SCP's Service Territory"),
     chart_subtitle=NULL,
     weighted_metrics=clean_top_metrics,
     include_basemap = FALSE,
@@ -385,47 +424,17 @@ Urban inequity results in lower *N~h~* populations not showing up in many dense 
 
 (ref:inset-map-fig-cap) An inset focused on the city of New Orleans, Louisiana (Orleans Parish). This view shows an example of the dynamics of energy poverty in an urban area where the presence of energy inequity is harder to see compared to rural areas for which census tracts are a larger physical area.
 
-```{r inset-map, include=TRUE, results='asis', fig.cap='(ref:inset-map-fig-cap)', fig.width=8.0,fig.height=5.5}
+```{r inset-map, eval=FALSE, include=TRUE, results='asis', fig.cap='(ref:inset-map-fig-cap)', fig.width=8.0,fig.height=5.5}
 
-old_inset_map_fig_cap <- "An inset focused on the city of New Orleans, Louisiana (Orleans Parish), showing an example of the dynamics of energy poverty in an urban area where the presence of energy inequity is harder to see compared to rural areas for which census tracts are a larger physical area."
+# find the largest urban area in the maps_data and zoom into that
 
-nola_msa_parishes <- c("Jefferson Parish", 
-                   "Orleans Parish", 
-                   "Plaquemines Parish", 
-                   "St. Bernard Parish", 
-                   "St. Charles Parish", 
-                   "St. James Parish", 
-                   "St. John the Baptist Parish", 
-                   "St. Tammany Parish")
+# inset_map_data <- map_data %>% filter(county_name=="Orleans Parish"
+#                                      & state_abbr=="LA")
 
-nola_csa_parishes <- c(nola_msa_parishes, 
-                       "Tangipahoa Parish",
-                       "Washington Parish")
-
-nola_rpc_parishes <- c("Jefferson Parish", 
-                   "Orleans Parish", 
-                   "Plaquemines Parish", 
-                   "St. Bernard Parish", 
-                   "St. Charles Parish", 
-                   # "St. James Parish", 
-                   "St. John the Baptist Parish", 
-                   "St. Tammany Parish",
-                   "Tangipahoa Parish")
-
-orleans_and_neighbors <- c("Orleans Parish",
-                           "St. Tammany Parish",
-                           "Jefferson Parish",
-                           "Plaquemines Parish", 
-                   "St. Bernard Parish"
-                           )
-
-inset_map_data <- map_data %>% filter(county_name=="Orleans Parish"
-                                     & state_abbr=="LA")
-
-inset_bb <- st_buffer(st_as_sfc(st_bbox(inset_map_data)) %>% st_transform(3857), dist=100000)
+inset_bb <- st_buffer(st_as_sfc(st_bbox(territory_map_data)) %>% st_transform(3857), dist=100000)
 
 choropleth_chart_highlight <- choropleth_map(
-    clean_data=map_data,
+    clean_data=state_map_data,
     group_columns,
     metric_name,
     metric_label,
@@ -446,7 +455,7 @@ choropleth_chart_highlight <- choropleth_map(
 
 # https://en.wikipedia.org/wiki/New_Orleans_metropolitan_area
 choropleth_chart_inset <- choropleth_map(
-    clean_data=inset_map_data,
+    clean_data=territory_map_data,
     group_columns,
     metric_name,
     metric_label,
@@ -454,7 +463,7 @@ choropleth_chart_inset <- choropleth_map(
     metric_cutoff_label,
     upper_quantile_view,
     lower_quantile_view,
-    chart_title="Inset of Energy Burdens in New Orleans, Louisiana",
+    chart_title="Inset of Energy Burdens in SCP's Service Territory",
     chart_subtitle=NULL,
     weighted_metrics=clean_top_metrics,
     include_basemap = TRUE,
@@ -931,13 +940,13 @@ gt_all_footnote <- gridExtra::grid.arrange(
 ```{r}
 group_columns <- c("state_abbr")
 # utility type? see chartbook
-graph_data <- filter_graph_data(clean_data=clean_data_ami[clean_data_ami$state_abbr!="DC",], 
+graph_data <- filter_graph_data(clean_data=clean_data_ami_all[clean_data_ami_all$state_abbr!="DC",], 
                                 group_columns=group_columns, 
                                 metric_name=metric_name)
 
 # percent of "other" fuel expenditures toward fossil fuel combustion
 # want to make this more precise by state, county, and/or balancing authority eventually
-other_gwm <- grouped_weighted_metrics(clean_data_fpl[clean_data_fpl$state_abbr!="DC",], 
+other_gwm <- grouped_weighted_metrics(clean_data_fpl_all[clean_data_fpl_all$state_abbr!="DC",], 
                                       c("primary_heating_fuel"),
                                       "other_spend",
                                       0)
@@ -1061,6 +1070,54 @@ lowest_ner_utility_specs <- filter(unique_utils,eia_id==as.numeric(lowest_ner_ut
 lowest_ner_utility_name <- lowest_ner_utility_specs$company_na
 lowest_ner_utility_name <- str_replace_all(lowest_ner_utility_name,"Corp","Corporation")
 lowest_ner_utility_name <- str_replace_all(lowest_ner_utility_name,"Member","Membership")
+```
+
+```{r eval=FALSE}
+#group_variable <- "eia_id"# "GEOID" #"state_abbr" #merge_geo_id" #
+group_columns <- c("company_na", "company_ty.x") #c("gisjoin") #
+graph_data <- filter_graph_data(left_join(clean_data_ami, 
+                                          replica_sup, by=c("geoid")), 
+                                group_columns, 
+                                metric_name)
+
+grid_operator_group <- calculate_weighted_metrics(graph_data, 
+                         group_columns, 
+                         metric_name, 
+                         metric_cutoff_level, 
+                         upper_quantile_view=0.75, 
+                         lower_quantile_view=0.25)
+
+grid_operator_group
+# left_join(clean_data_ami, replica_sup, by=c("geoid")) %>% 
+#   filter(state_abbr.x=="CA", county_name %in% c("Sonoma County","Mendocino County")) %>% 
+#   dplyr::select(c(company_ty.x, company_na, county_name)) %>% 
+#   distinct() %>% 
+#   arrange(company_ty.x, company_na) %>% 
+#   print(n=50)
+```
+
+```{r eval=FALSE}
+#group_variable <- "eia_id"# "GEOID" #"state_abbr" #merge_geo_id" #
+group_columns <- c("company_na", "company_ty.x", "county_name") #c("gisjoin") #
+graph_data <- filter_graph_data(left_join(clean_data_ami, 
+                                          replica_sup, by=c("geoid")), 
+                                group_columns, 
+                                metric_name)
+
+grid_operator_group <- calculate_weighted_metrics(graph_data, 
+                         group_columns, 
+                         metric_name, 
+                         metric_cutoff_level, 
+                         upper_quantile_view=0.75, 
+                         lower_quantile_view=0.25)
+
+grid_operator_group
+# left_join(clean_data_ami, replica_sup, by=c("geoid")) %>% 
+#   filter(state_abbr.x=="CA", county_name %in% c("Sonoma County","Mendocino County")) %>% 
+#   dplyr::select(c(company_ty.x, company_na, county_name)) %>% 
+#   distinct() %>% 
+#   arrange(company_ty.x, company_na) %>% 
+#   print(n=50)
 ```
 
 #### Discussion  {#discussion}
@@ -1247,17 +1304,17 @@ The meaning of the “primary heating fuel” category comes from the answer to 
 Though the REPLICA dataset relies on a different vintage of the LEAD dataset (assembled in 2017[@sigrinRooftopSolarTechnical2018]) than this analysis (assembled in 2019[@maLowIncomeEnergyAffordability2019]), inferring differences among annual estimates is not meaningful due to the standard error of the data [@maLowIncomeEnergyAffordability2019]. A rigorous treatment of these metrics over time is an area for future research.
 
 The results inferred from eGRID are only as good as the eGRID methodology itself. We choose to outline the proportion of combusted fuels rather than emissions data due to the limitations outlined by proponents of marginal emissions attribution in electric power system models[@vonwaldAnalyzingCaliforniaFramework2020]^,^[@siler-evansMarginalEmissionsFactors2012] and limitations in estimating regional electricity transfers[@vonwaldAccountingGreenhouseGas2021].
-[[Expanding quantitative analysis of energy affordability can offer additional context, including the use of ratios to identify populations that could be particularly vulnerable to energy shocks or absolute energy burdens. Developing such metrics can elucidate the scale on which American households must save for energy consumption. Frequently used metrics in this category do not tell the whole story. For instance, the simple proportion of a household’s income spent on energy bills (a.k.a. energy burden) does not capture the underlying monthly cash flow patterns that may stress household budgets.]{strike=`r strike_show`}]{color=`r edit_color`}
+Expanding quantitative analysis of energy affordability can offer additional context, including the use of ratios to identify populations that could be particularly vulnerable to energy shocks or absolute energy burdens. Developing such metrics can elucidate the scale on which American households must save for energy consumption. Frequently used metrics in this category do not tell the whole story. For instance, the simple proportion of a household’s income spent on energy bills (a.k.a. energy burden) does not capture the underlying monthly cash flow patterns that may stress household budgets.
 
 ## Code Availability {#code-availability}
 
-The code and data to fully reproduce this paper are available on GitHub at [[https://github.com/ericscheier/net_energy_equity](https://github.com/ericscheier/net_energy_equity)]{hide=`r hide`} under the GNU Affero General Public License v3.0. [The most recent release of the software can be found at [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierMeasurementStrategyAddress2021].]{highlight=`r highlight`}
+The code and data to fully reproduce this paper are available on GitHub at [https://github.com/ericscheier/net_energy_equity](https://github.com/ericscheier/net_energy_equity) under the GNU Affero General Public License v3.0. The most recent release of the software can be found at [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierMeasurementStrategyAddress2021].
 
 ## Data Availability  {#data-availability}
 
-[The data generated in this study have been deposited in the the Zenodo database under [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierMeasurementStrategyAddress2021].]{highlight=`r highlight`}
+The data generated in this study have been deposited in the the Zenodo database under [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierMeasurementStrategyAddress2021].
 
-All data necessary for the composition of the source datasets used in this analysis are freely available from [US]{color=`r edit_color`} government sources as open data. All functions to automatically retrieve and assemble these data and compiled versions of these data are made available to the user as part of the software [available at [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierMeasurementStrategyAddress2021].]{highlight=`r highlight`}.
+All data necessary for the composition of the source datasets used in this analysis are freely available from US government sources as open data. All functions to automatically retrieve and assemble these data and compiled versions of these data are made available to the user as part of the software available at [DOI: 10.5281/zenodo.5676225](https://doi.org/10.5281/zenodo.5676225)[@scheierMeasurementStrategyAddress2021].
 
 ## References  {#references}
 

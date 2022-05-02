@@ -1,0 +1,957 @@
+---
+title: "A measurement strategy to address disparities across household energy burdens"
+author: ""
+institute: 
+  - "Focus: Orange County, NC"
+  - "These Slides Were Created On:"
+date: "`r format(Sys.time(), '%Y-%B-%d')`"
+output: 
+  beamer_presentation:
+    slide_level: 1
+    toc: false #true
+    theme: "Berkeley"
+    colortheme: "seagull"
+    fonttheme: "structurebold"
+header-includes:
+  - \usepackage{booktabs}
+  - \usepackage{makecell}
+  - \setbeameroption{hide notes} #{show/hide notes}
+  - \setbeamerfont{note page}{size=\tiny} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo=FALSE,
+  message=FALSE,
+  warning=FALSE,
+  include=FALSE
+  )
+
+library(tidyverse)
+library(knitr)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+
+source("sources.R")
+```
+
+```{r parameters}
+
+focus_state <- "North Carolina"
+focus_state_abbr <- "NC" #c("ca","nc","sc") #
+focus_state
+
+scope_counties <- list("NC"=
+                         c(
+                           "Orange County",
+                           "Durham County",
+                           "Wake County"
+                           ),
+                       "CA"=
+                         c("Sonoma County",
+                           "Mendocino County")
+                       )
+
+focus_counties_table <- data.frame(
+  county_abbr=unlist(focus_counties), 
+  state_abbr=str_remove(names(unlist(focus_counties)),"[0-9]"))
+
+focus_companies <- c("Duke Energy Carolinas", "Duke Energy Progress")
+
+focus_communities <- 
+
+refresh <- FALSE
+acs_version <- 2018
+energy_burden_poverty_line <- 0.06
+# geographic_scope <- "tract" #statecitycounty
+
+```
+
+```{r load-data}
+clean_data_ami_all <- read_csv("CohortData_AreaMedianIncome.csv")
+clean_data_fpl_all <- read_csv("CohortData_FederalPovertyLine.csv")
+replica_sup <- read_csv("CensusTractData.csv") #get_replica_supplemental_dataset()
+
+census_tracts_shp <- get_tract_shapefiles(
+    states="all",
+    acs_version=acs_version,
+    refresh=refresh,
+    return_files=TRUE,
+    all_from_list=unique(replica_sup$state_abbr)
+  )
+```
+
+
+```{r preprocessing}
+clean_data_ami_all_sup <- left_join(clean_data_ami_all, replica_sup, by=c("geoid"))
+clean_data_ami_fpl_sup <- left_join(clean_data_fpl_all, replica_sup, by=c("geo_id"="geoid"))
+
+clean_data_ami_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_ami_all_sup, by=c("gisjoin")))
+clean_data_fpl_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_fpl_all_sup, by=c("gisjoin")))
+
+
+clean_data_ami <- clean_data_ami_ami_sup_shp %>%
+                                  filter(state_abbr %in% names(focus_counties), 
+                                         county_name %in% 
+                                           c(focus_counties),
+                                         # company_na %in% c("Pacific Gas & Electric Co",
+                                                           # "Trinity Public Utilities District")
+                                         )
+
+clean_data_fpl <- clean_data_ami_fpl_sup_shp %>%
+                                  filter(state_abbr=="NC", 
+                                         county_name %in% 
+                                           c("Orange County",
+                                             "Durham County",
+                                             "Wake County"
+                                             )#,
+                                         # company_na %in% c("Pacific Gas & Electric Co",
+                                         #                   "Trinity Public Utilities District")
+                                         )
+
+# this is where geospatial and other filtering should happen
+
+## define territory 
+## define zoom scope/area - if NULL, use the most populous scale below the territory scale (e.g. largest city in the county)
+
+source("paper_source.R")
+# tract_file_name <- paste0("data/",paste(states,collapse="_",sep=""),"_census_tracts.geojson")
+
+
+
+tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
+
+continental_shp <- tract_shp %>% filter(!(state_abbr %in% c("HI","AK", NA)))
+
+state_shp <- tract_shp %>% filter(state_abbr %in% focus_states)
+
+county_shp <- tract_shp %>% filter(paste(county_name,state_abbr,sep=";") %in% c("Orange County;NC"))
+
+grid_operator_shp <- tract_shp %>% filter(company_na %in% focus_companies)
+
+territory_shp <- tract_shp %>% filter(state_abbr=="NC", 
+                                         county_name %in% 
+                                           c("Orange County"),
+                                         company_na %in% c("Piedmont Electric Member Corp")
+                                         )
+
+group_variable <- "geoid"# "GEOID" #"state_abbr" #merge_geo_id" #
+group_columns <- c(group_variable) #c("gisjoin") #
+
+
+# add utility cutout
+# utility_shp <- tract_shp %>% filter(company_na=="")
+
+# full_map_data <- left_join(tract_shp, gwm, by=c("geoid"))
+
+gwm <- calculate_weighted_metrics(filter_graph_data(clean_data_ami_all,
+                                                    c("geoid"),
+                                                    metric_name),
+                           c("geoid"),
+                           metric_name,
+                           metric_cutoff_level=0,
+                           upper_quantile_view = 1,
+                           lower_quantile_view=0)
+
+gwm$metric_name <- metric_name
+
+territory_map_data <- left_join(territory_shp, gwm, by=c("geoid"))
+state_map_data <- left_join(state_shp, gwm, by=c("geoid"))
+county_map_data <- left_join(county_shp, gwm, by=c("geoid"))
+continental_map_data <- left_join(continental_shp, gwm, by=c("geoid"))
+grid_operator_map_data <- left_join(grid_operator_shp, gwm, by=c("geoid"))
+```
+
+# New Data
+
+Low-Income Energy Affordability Data (LEAD)
+
+**Purpose**: "to help state and local partners understand housing and energy characteristics for the low- and moderate-income (LMI) communities they serve"
+
+  + **Source**: U.S. Department of Energy
+  + **Method**: Iterative Proportional Fitting (IPF) of responses from the 5-year American Community Survey (ACS-5)
+  + **Geography**: Census tracts for 50 states, D.C., & P.R.
+  + **Provides**: Incomes and Energy Costs by Housing Characteristics
+  + **Years**: 2016, 2018
+
+\note{
+Distinct urban and rural analyses have been performed to describe energy inequity in the US. While limited by geographic and demographic focus and a lack of peer-review, these studies have established the proportion of income (G) spent on energy expenditures (S), or energy burden (Eb), as the standard benchmark for energy poverty in the US today (Equation 1). The US Department of Energy (DOE) significantly improved upon previous methodology by assembling its Low-Income Energy Affordability Dataset (LEAD), which estimates incomes and energy expenditures for most households in the US at a census tract scale.
+}
+
+# Energy Burden & Net Energy Return
+
+\[G = Gross\ Income\ ;\ S = Spending\ on\ Energy\]
+\[
+Energy\ Burden\ (E_{b})= \frac{S}{G}
+\]
+\[
+Household\ Net\ Energy\ Return\ (N_{h}) = \frac{G - S}{S}
+\]
+\[E_{B}^{*} = \frac{S}{G} = 6\%\ ;\ N_{h}^{*} \approx 16 \Rightarrow Household\ at\ Energy\ Poverty\ Line\]
+
+```{r load-table-full, include=FALSE}
+compare_table <- create_comparison_table(
+    metrics_to_compare=NULL,
+    input_dataset=clean_data_ami_all,
+    include_totals=TRUE
+)
+```
+
+```{r table-full, results="asis"}
+create_printable_comparison_table(compare_table) %>%  knitr::kable(booktabs=T, escape = F) %>%
+  kable_styling(latex_options="scale_down")
+  #kableExtra::kable_styling(latex_options = c("striped","hold_position"))
+```
+
+# Geography
+
+```{r pressure, fig.cap=""}
+clean_top_metrics <- grouped_weighted_metrics(filter_graph_data(clean_data_ami_all, 
+                                                                group_columns=NULL,
+                                                                metric_name),# %>% 
+                                                #filter(!(state_abbr %in% c("HI","AK", NA))), 
+                         group_columns=NULL, 
+                         metric_name, 
+                         metric_cutoff_level, 
+                         upper_quantile_view=.995, 
+                         lower_quantile_view=0.005)
+
+choropleth_chart <- choropleth_map(
+    clean_data=continental_map_data,
+    group_columns,
+    metric_name,
+    metric_label="%",
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view,
+    lower_quantile_view,
+    chart_title=paste0("Energy Burdens in the Continental United States"),
+    chart_subtitle=NULL,
+    weighted_metrics=clean_top_metrics,
+    include_basemap = FALSE,
+    include_compass = TRUE,
+    metric_long_name = bquote(E[b]),
+    include_borders=TRUE
+      ) 
+  
+
+# choropleth_chart
+
+choropleth_chart_footnote <- gridExtra::grid.arrange(
+  choropleth_chart,
+  bottom = textGrob(as.expression(
+                                           bquote(~italic(
+                                             E[b]
+                                             )~": Energy Burden")
+                                           ), 
+                    x = 1,
+                    hjust = 1, 
+                    gp = gpar(
+                                  # fontface = 3L,
+                                  fontsize = 9))
+)
+```
+
+\note{
+Another contribution of this work is that by using Nh, we can display these data spatially across the US to
+explore how different communities are experiencing energy outcomes as in Figure 2 and investigate specific
+communities at multiple scales such as census tract, county, state, and regional as in Figure 3. This figure shows a spatial display of energy poverty that includes 5.3 million more households that would not be captured by traditional poverty metrics because their incomes are too low (Eb>100\%) or too high (above the FPL). By processing disparate data sources into a coherent structure and providing a convenient open-source tool for others to do the same, these data can be used in urban planning, public policy, and other relevant contexts. Displayed geospatially in Figure 2, the Black Belt in the American Southeast is visibly perceptible as an area of high burden, indicating that low-Nh follows racial lines. Likewise, border populations and immigrant populated areas in the Southwest have higher burdens, as do Native American lands. High burdens can also be seen in rural Northeast states where heating burdens are high. Nh allows a nuanced view of these widely ranging income dynamics by portraying them on a scale that matches the scope of the issues: areas of high energy burden (close to Nh=0) are visible in orange while highly affluent areas are also visually perceptible as dark blue even though these groups’ average metrics are multiple orders of magnitude apart.
+}
+
+# State Scale
+
+```{r, fig.cap=""}
+choropleth_chart <- choropleth_map(
+    clean_data=state_map_data,
+    group_columns,
+    metric_name,
+    metric_label="%",
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view,
+    lower_quantile_view,
+    chart_title=paste0("Energy Burdens in California"),
+    chart_subtitle=NULL,
+    weighted_metrics=clean_top_metrics,
+    include_basemap = FALSE,
+    include_compass = FALSE,
+    legend_position=c(0.25, 0.125),
+    metric_long_name = bquote(E[b]),
+    include_borders=TRUE,
+    border_field="county_fips"
+      ) 
+  
+
+# choropleth_chart
+
+choropleth_chart_footnote <- gridExtra::grid.arrange(
+  choropleth_chart,
+  bottom = textGrob(as.expression(
+                                           bquote(~italic(
+                                             E[b]
+                                             )~": Energy Burden")
+                                           ), 
+                    x = 1,
+                    hjust = 1, 
+                    gp = gpar(
+                                  # fontface = 3L,
+                                  fontsize = 9))
+)
+```
+
+# County Scale
+
+```{r}
+# clean_top_metrics <- grouped_weighted_metrics(graph_data,# %>% 
+#                                                 #filter(!(state_abbr %in% c("HI","AK", NA))), 
+#                          group_columns=NULL, 
+#                          metric_name, 
+#                          metric_cutoff_level, 
+#                          upper_quantile_view=.995, 
+#                          lower_quantile_view=0.005)
+
+choropleth_chart <- choropleth_map(
+    clean_data=county_map_data,
+    group_columns,
+    metric_name,
+    metric_label="%",
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view=.75,
+    lower_quantile_view=.001,
+    chart_title=paste0("Energy Burdens in Orange County, NC"),
+    chart_subtitle=NULL,
+    weighted_metrics=clean_top_metrics,
+    include_basemap = FALSE,
+    include_compass = FALSE,
+    legend_position=c(0.25, 0.125),
+    metric_long_name = bquote(E[b]),
+    include_borders=TRUE,
+    border_field="tract_fips"
+      ) 
+  
+
+# choropleth_chart
+
+choropleth_chart_footnote <- gridExtra::grid.arrange(
+  choropleth_chart,
+  bottom = textGrob(as.expression(
+                                           bquote(~italic(
+                                             E[b]
+                                             )~": Energy Burden")
+                                           ), 
+                    x = 1,
+                    hjust = 1, 
+                    gp = gpar(
+                                  # fontface = 3L,
+                                  fontsize = 9))
+)
+```
+
+
+# Service Territory Scale
+
+```{r}
+# PG&E
+choropleth_chart <- choropleth_map(
+    clean_data=grid_operator_map_data,
+    group_columns,
+    metric_name,
+    metric_label="%",
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view,
+    lower_quantile_view,
+    chart_title=paste0("Energy Burdens on Duke Energy NC Grid"),
+    chart_subtitle=NULL,
+    weighted_metrics=clean_top_metrics,
+    include_basemap = TRUE,
+    include_compass = FALSE,
+    legend_position=c(0.30, 0.125),
+    metric_long_name = bquote(N[h]),
+    include_borders=TRUE,
+    border_field="county_fips"
+      ) 
+  
+
+# choropleth_chart
+
+choropleth_chart_footnote <- gridExtra::grid.arrange(
+  choropleth_chart,
+  bottom = textGrob(as.expression(
+                                           bquote(~italic(
+                                             E[b]
+                                             )~": Energy Burden")
+                                           ), 
+                    x = 1,
+                    hjust = 1, 
+                    gp = gpar(
+                                  # fontface = 3L,
+                                  fontsize = 9))
+)
+```
+
+
+# Distribution Territory Scale
+
+```{r}
+choropleth_chart <- choropleth_map(
+    clean_data=territory_map_data,
+    group_columns,
+    metric_name,
+    metric_label="%",
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view,
+    lower_quantile_view,
+    chart_title=paste0("Energy Burdens on Local Distribution Cooperative Grid (Piedmont EMC)"),
+    chart_subtitle=NULL,
+    weighted_metrics=clean_top_metrics,
+    include_basemap = TRUE,
+    include_compass = FALSE,
+    legend_position=c(0.30, 0.125),
+    metric_long_name = bquote(N[h]),
+    include_borders=TRUE,
+    border_field="county_fips"
+      ) 
+  
+
+# choropleth_chart
+
+choropleth_chart_footnote <- gridExtra::grid.arrange(
+  choropleth_chart,
+  bottom = textGrob(as.expression(
+                                           bquote(~italic(
+                                             E[b]
+                                             )~": Energy Burden")
+                                           ), 
+                    x = 1,
+                    hjust = 1, 
+                    gp = gpar(
+                                  # fontface = 3L,
+                                  fontsize = 9))
+)
+```
+
+
+```{r}
+# Urban Scale
+
+# zoom into Santa Rosa or similar metro area?
+```
+
+
+\note{
+Urban inequity results in lower Nh populations not showing up in many dense or gentrified urban areas such
+as the San Francisco Bay Area, New York City, and New Orleans, as shown in Figure 3. The pervasiveness
+of urban energy poverty in Detroit has been studied extensively and shown to have distinct geographic
+boundaries down to the street level19. While some of these conclusions are supported by existing evidence
+and literature, they should be confirmed with a rigorous analysis of this dataset using the Nh metric for the
+reasons explained in Applying NER to Energy Equity: extremely low-income households are not visible on a
+0-100\% scale, and households with no income are often discarded as outliers. Additional analyses should
+incorporate additional demographic and household dimensions due to potential disparities within census
+tracts since diverse neighborhoods may not be represented accurately by aggregate census tract metrics.
+}
+
+# High Level
+
+```{r}
+
+calc_energy_poverty_rates <- function(
+    input_dataset,
+    metric_name,
+    metric_cutoff_level
+    ){
+      fpl_top_metrics <- grouped_weighted_metrics(
+        filter_graph_data(
+          input_dataset, 
+          group_columns="in_poverty", 
+          metric_name),
+        group_columns="in_poverty", 
+        metric_name=metric_name, 
+        metric_cutoff_level=metric_cutoff_level, 
+        upper_quantile_view=1.00, 
+        lower_quantile_view=0.00)
+      
+      total_households <- fpl_top_metrics$household_count
+      
+      number_in_poverty <- fpl_top_metrics$households_below_cutoff
+      
+      pct_in_poverty <- number_in_poverty / total_households
+      
+      pct_above_poverty <- 1 - pct_in_poverty
+      
+      in_both_poverty <- pct_in_poverty[2]
+      
+      in_only_energy_poverty <- pct_in_poverty[1]
+      
+      energy_poverty_rate <- sum(number_in_poverty) / sum(total_households)
+      
+      energy_poverty_rates <- list(
+        total_households=total_households,
+        number_in_poverty=number_in_poverty,
+        pct_in_poverty=pct_in_poverty,
+        pct_above_poverty=pct_above_poverty,
+        in_both_poverty=in_both_poverty,
+        in_only_energy_poverty=in_only_energy_poverty,
+        energy_poverty_rate=energy_poverty_rate
+      )
+      
+      return(energy_poverty_rates)
+}
+```
+
+
+```{r}
+all_ep_rates <- calc_energy_poverty_rates(
+    input_dataset=clean_data_fpl_all,
+    metric_name,
+    metric_cutoff_level
+    )
+
+territory_ep_rates <- calc_energy_poverty_rates(
+    input_dataset=clean_data_fpl,
+    metric_name,
+    metric_cutoff_level
+    )
+
+energy_poverty_rate <- all_ep_rates$energy_poverty_rate
+territory_energy_poverty_rate <- territory_ep_rates$energy_poverty_rate
+
+territory_energy_burden_poverty_line <- energy_burden_poverty_line
+
+fpl_gap_households <- ifelse(
+  all_ep_rates$number_in_poverty[1]>10^6,
+  to_million(all_ep_rates$number_in_poverty[1]),
+  to_big(all_ep_rates$number_in_poverty[1]))
+
+territory_fpl_gap_households <- ifelse(
+  territory_ep_rates$number_in_poverty[1]>10^6,
+  to_million(territory_ep_rates$number_in_poverty[1]),
+  to_big(territory_ep_rates$number_in_poverty[1]))
+```
+
+In Orange County [the United States] -- `r scales::percent(territory_energy_poverty_rate, accuracy=1)` [`r scales::percent(energy_poverty_rate, accuracy=1)`] of households experience energy poverty as presently defined as spending more than `r to_percent(territory_energy_burden_poverty_line)` [`r to_percent(energy_burden_poverty_line)`] of household income on energy expenditures and more than `r territory_fpl_gap_households` [`r fpl_gap_households`] households above the Federal Poverty Line face energy poverty (`r to_percent(territory_ep_rates$in_only_energy_poverty)` [`r to_percent(all_ep_rates$in_only_energy_poverty)`] of this subset).
+
+```{r territory-load-table-full, include=FALSE}
+territory_compare_table <- create_comparison_table(
+    metrics_to_compare=NULL,
+    input_dataset=clean_data_ami,
+    include_totals=TRUE
+)
+```
+
+```{r territory-table-full, results="asis"}
+create_printable_comparison_table(territory_compare_table) %>%  knitr::kable(booktabs=T, escape = F) %>%
+  kable_styling(latex_options="scale_down")
+  #kableExtra::kable_styling(latex_options = c("striped","hold_position"))
+```
+
+# Energy Burden Distribution in County
+
+```{r}
+top_line_group <- NULL
+
+p1 <-   density_chart(graph_data, 
+                                 metric_name, 
+                                 metric_label=as.expression(
+                                           bquote(~italic(
+                                             N[h]
+                                             ))
+                                           ), 
+                                 group_columns=top_line_group, 
+                                 metric_cutoff_level, 
+                                 metric_cutoff_label, 
+                                 chart_title="Distribution of Energy Burdens", 
+                                 chart_subtitle=NULL,
+                                 x_label="Proportion of Households")
+p1
+```
+
+
+# Household Breakdowns
+
+```{r}
+top_line_group <- "income_bracket"
+
+top_line_charts <- make_all_charts(clean_data_fpl,
+                            group_columns=top_line_group,
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            x_label="")
+p2=top_line_charts[["density"]]
+p2_stats=top_line_charts[["metrics"]]
+```
+\note{
+`r p2_stats`
+}
+
+```{r}
+top_line_group <- c("simplified_primary_heating_fuel")
+
+top_line_charts <- make_all_charts(clean_data_fpl,
+                            group_columns=top_line_group,
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            chart_caption=NULL,
+                            x_label="")
+p3=top_line_charts[["density"]]
+p3_stats=top_line_charts[["metrics"]]
+```
+```{r}
+top_line_group <- c("number_of_units")
+# c("number_of_units", "occupancy_type"),
+#                           c("occupancy_type", "income_bracket"),
+#                           c("number_of_units", "occupancy_type", "income_bracket"),
+
+top_line_charts <- make_all_charts(clean_data_ami,
+                            group_columns=top_line_group,
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            x_label="")
+p4=top_line_charts[["density"]]
+```
+
+
+```{r}
+top_line_group <- c("housing_tenure")
+
+top_line_charts <- make_all_charts(clean_data_fpl,
+                            group_columns=top_line_group,
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            x_label="")
+p5=top_line_charts[["density"]]
+p5_stats=top_line_charts[["metrics"]]
+```
+
+
+```{r}
+minority_races <- c("hispanic","african_american","asian","native_american")
+races <- c(minority_races,"caucasian")
+
+pct_races <- replica_sup[,paste0("pop_",races)] / rowSums(replica_sup[,paste0("pop_",races)])
+names(pct_races) <- paste0("pct_",races)
+
+plurality_race <- races[max.col(pct_races,ties.method = "first")]
+
+plurality_race <- ifelse(plurality_race=="african_american","black",
+                                   ifelse(plurality_race=="native_american","indian",
+                                          ifelse(plurality_race=="caucasian","white",
+                                          plurality_race)))
+
+race_data <- data.frame("geoid"=replica_sup$geoid,
+                        "race"=plurality_race)
+
+data_with_race <- inner_join(x=clean_data_ami, 
+                             y=na.omit(race_data), by = "geoid")
+
+top_line_group <- c("race")
+
+top_line_charts <- make_all_charts(data_with_race,
+                            group_columns=top_line_group,
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            chart_caption=NULL,
+                            x_label="")
+p7=top_line_charts[["density"]]
+p7_stats=top_line_charts[["metrics"]]
+education_levels <- c("some_college_plus","high_school", "no_high_school")
+```
+
+
+```{r}
+pct_education_levels <- replica_sup[,paste0("pop25_",education_levels)] / 
+  rowSums(replica_sup[,paste0("pop25_",education_levels)])
+names(pct_education_levels) <- paste0("pct_",education_levels)
+
+plurality_education_level <- education_levels[max.col(pct_education_levels,ties.method = "first")]
+
+plurality_education_level <- ifelse(plurality_education_level %in% 
+                                      c("high_school","no_high_school"),
+                                    "high school or less",
+                                    ifelse(plurality_education_level=="some_college_plus",
+                                           "college or more",
+                                          plurality_education_level))
+
+education_data <- data.frame("geoid"=replica_sup$geoid,
+                        "simplified_education"=plurality_education_level)
+
+
+top_line_group <- c("simplified_education")
+
+top_line_charts <- make_all_charts(inner_join(x=clean_data_ami, y=na.omit(education_data), by = "geoid"),
+                            group_columns=top_line_group,
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            chart_caption=NULL,
+                            x_label="")
+p8=top_line_charts[["density"]]
+p8_stats=top_line_charts[["metrics"]]
+```
+
+
+```{r breakdowns, fig.cap=""}
+gt <- patchwork::patchworkGrob((p2+p3+p4)/(p5+p7+p8)  + 
+                                 plot_layout(heights = c(1,1)) +
+  plot_annotation(tag_levels = 'a') &
+  theme(plot.tag = element_text(face = 'bold')))
+# gridExtra::grid.arrange(gt, left = "Disp", bottom = "Hp // Cyl")
+gt_all <- gridExtra::arrangeGrob(gt, 
+                        top="Distribution of Energy Burdens Across Household Characteristics",
+                        bottom="Proportion of Households",
+                        left=grid.text(label=
+                                         as.expression(
+                                           bquote(~italic(
+                                             N[h]
+                                             ))
+                                           ),
+                                       draw=FALSE
+                                       ))
+
+gt_all_footnote <- gridExtra::grid.arrange(
+  gt_all,
+  bottom = textGrob(as.expression(
+                                           bquote(~italic(
+                                             N[h]
+                                             )~": Household Net Energy Return")
+                                           ), 
+                    x = 1,
+                    hjust = 1, 
+                    gp = gpar(
+                                  # fontface = 3L,
+                                  fontsize = 9))
+)
+```
+
+\note{
+From this high level, we can see in Figure 4.a that approximately 16\% of households in the US experience energy poverty.
+
+Displaying these communities defined by their relationship to the US Federal Poverty Line
+(FPL), which indicates income poverty status according to government policy, in Figure 4.b provides a stark picture. While 94\% of households below the FPL also face energy poverty, more than 5.2 million of those households above the FPL face this scarcity, underscoring the relative burden of energy expenditures as a poverty trap and the inadequacy of FPL as an indicator of energy poverty in particular. 
+
+This suggests that energy poverty may be a useful metric for identifying households at risk of other forms of poverty. However, we find that most households experiencing energy poverty are also suffering from a broader lack of access to resources characterized by income-based poverty. Given that the quality of energy used by low-income households is expected to be of similar inherent usefulness, this stark contrast in Nh on the households’ energy investments is surprising.
+
+Figure 4.c shows that households with solar as a primary heating fuel have a higher Nh (Nh=111) than those which rely on other fuel sources (Nh=33), even for households far below the energy poverty line: the average
+Nh for energy-impoverished households utilizing solar power is 19, compared to 7 for those relying on any other fuel source. The slope of the Nh density lines in Figure 4.c indicates that these lower-income households seem to experience a different rate of return on Nh from the benefits of increased energy adoption than higher-income households. Why are certain households not receiving the same benefits of their fuel source across the distribution of incomes? This could be due to lower-income households’ low consumption, meaning that the potential savings from implementing energy efficiency measures are lower than for high-income households.
+}
+
+# Confounding Characteristics
+
+```{r}
+top_line_group <- c("housing_tenure",
+                    "number_of_units")
+
+top_line_charts <- make_all_charts(clean_data_fpl %>% filter(!is.na(number_of_units)),
+                            group_columns=top_line_group,
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            x_label="")
+multifam_stats=top_line_charts
+```
+
+```{r}
+top_line_group <- c("housing_tenure",
+                    "income_bracket")
+
+top_line_charts <- make_all_charts(clean_data_fpl,
+                            group_columns=top_line_group,
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            x_label="")
+housing_income_stats=top_line_charts
+```
+
+```{r}
+gt <- patchwork::patchworkGrob(multifam_stats[["density"]]+housing_income_stats[["density"]]  + 
+                                 plot_layout(
+                                   widths = c(1,1)) +
+  plot_annotation(tag_levels = 'a') &
+  theme(plot.tag = element_text(face = 'bold')))
+# gridExtra::grid.arrange(gt, left = "Disp", bottom = "Hp // Cyl")
+gt_all <- gridExtra::arrangeGrob(gt, 
+                        top="Distribution of Energy Burdens Across Household Characteristics",
+                        bottom="Proportion of Households",
+                        left=grid.text(label=
+                                         as.expression(
+                                           bquote(~italic(
+                                             N[h]
+                                             ))
+                                           ),
+                                       draw=FALSE
+                                       ))
+
+gt_all_footnote <- gridExtra::grid.arrange(
+  gt_all,
+  bottom = textGrob(as.expression(
+                                           bquote(~italic(
+                                             N[h]
+                                             )~": Household Net Energy Return")
+                                           ), 
+                    x = 1,
+                    hjust = 1, 
+                    gp = gpar(
+                                  # fontface = 3L,
+                                  fontsize = 9))
+)
+```
+
+
+
+# State Comparison by Fuel Composition
+
+```{r states, fig.cap=""}
+group_columns <- c("state_abbr")
+# utility type? see chartbook
+graph_data <- filter_graph_data(clean_data=clean_data_ami_all[clean_data_ami_all$state_abbr!="DC",], 
+                                group_columns=group_columns, 
+                                metric_name=metric_name)
+
+# percent of "other" fuel expenditures toward fossil fuel combustion
+# want to make this more precise by state, county, and/or balancing authority eventually
+other_gwm <- grouped_weighted_metrics(clean_data_fpl_all[clean_data_fpl_all$state_abbr!="DC",], 
+                                      c("primary_heating_fuel"),
+                                      "other_spend",
+                                      0)
+
+other_fuels <- c("COAL","FUEL OIL","NONE","OTHER","SOLAR","WOOD","BOTTLED GAS")
+non_fossil_other_fuels <- c("NONE","SOLAR","WOOD")
+fossil_other_fuels <- other_fuels[!(other_fuels %in% non_fossil_other_fuels)]
+
+other_fossil <- other_gwm[other_gwm$primary_heating_fuel %in% fossil_other_fuels,
+                              c("household_count","metric_mean")]
+
+pct_other_fossil <- sum(other_fossil$household_count*other_fossil$metric_mean)/
+  sum(other_gwm$household_count*other_gwm$metric_mean)
+
+graph_data$pct_other_fossil <- pct_other_fossil
+
+# percent of each state's electric grid decidated to fossil fuel combustion
+# can refine by balancing authority based on REPLICA dataset
+egrid <- get_state_egrid()
+
+egrid$pct_electricity_fossil <- egrid$STCLPR + #coal
+  egrid$STOLPR + #oil
+  egrid$STGSPR + #gas
+  egrid$STOFPR #+ #other fossil
+  # egrid$STNCPR #+ #nuclear
+  # egrid$STHYPR #+ #hydro
+  # egrid$STOPPR #unknown/purchased
+
+graph_data <- left_join(graph_data, egrid, by=c("state_fips"="FIPSST"))
+
+# graph_data <- graph_data[graph_data$state_abbr!="DC",]
+
+# percent of natural gas expenditures dedicateed to fossil fuel combustion...
+pct_gas_fossil <- 1.0
+
+graph_data$pct_gas_fossil <- pct_gas_fossil
+
+graph_data$pct_fossil_tract <- (graph_data$pct_gas_fossil * graph_data$gas_spend + 
+  graph_data$pct_electricity_fossil * graph_data$electricity_spend + 
+  graph_data$pct_other_fossil * graph_data$other_spend) / 
+  (graph_data$gas_spend + graph_data$electricity_spend + graph_data$other_spend)
+
+
+pct_fossil_gwm <- grouped_weighted_metrics(graph_data, "state_fips","pct_fossil_tract",0) %>% 
+  dplyr::rename(pct_fossil=metric_mean)
+
+graph_data <- left_join(graph_data, 
+                        pct_fossil_gwm[,c("state_fips","pct_fossil")], 
+                        by="state_fips")
+
+top_line_charts <- make_all_charts(graph_data,
+                            group_columns="state_abbr",
+                            metric_name,
+                            metric_label="", 
+                            metric_cutoff_level,
+                            metric_cutoff_label=NULL,
+                            #upper_quantile_view,
+                            #lower_quantile_view,
+                            chart_title=NULL,
+                            chart_subtitle=NULL,
+                            chart_caption=NULL)
+
+state_by_state <- top_line_charts[["metrics"]]
+
+electricity_prices_summary <- calculate_weighted_metrics(graph_data, 
+                                                         c("state_abbr"), 
+                                                         "dlrs_kwh", 
+                                                         metric_cutoff_level = 
+                                                           ner_poverty_line)
+
+x_label <- as.expression(bquote(~italic(N[h])~": Household Net Energy Return"))
+
+
+y <- make_violin_chart(graph_data=graph_data,
+                      group_columns=group_columns,
+                      metric_name=metric_name,
+                      metric_label=metric_label,
+                      metric_cutoff_level=metric_cutoff_level,
+                      fill_metric="pct_fossil",#"STCYPR",#"STSOPR",
+                      fill_label="% of Energy Expenditures on \nFossil Fuel Combustion",#Combustion",#Solar",
+                      group_name="State",
+                      chart_title="Comparison of Energy Burdens Among the United States",
+                      x_label=x_label)
+print(y)
+```
+
+\note{
+Assessing the Nhs among different states in Figure 5 presents a counterintuitive picture of how states address energy poverty and energy equity. Nh can equate communities that experience high energy costs and low incomes with those with high incomes and even higher energy costs. This explains why states such as
+Connecticut (Nh=26) and Vermont (Nh=23), where 47\% and 30\% higher than average electricity prices may pose affordability threats for communities affected by higher prices, are similarly positioned on the list to states such as Mississippi (Nh=22) and Alabama (Nh=24), which have significant low-income populations
+and low per-unit energy prices (22\% and 8\% lower than average, respectively"‘). Not only are households in these states falling behind in terms of income, but net incomes are lower relative to energy expenditures than neighboring states and other parts of the country. This may be appropriate: while the equity issues in
+Southeastern states are well studied, states such as Maine that continue to utilize residential heating energy sources like oil and fuelwood may suffer not only from lack of efficiency but also health impacts. States may need to pay attention to these dynamics from an affordability perspective, and further targeted energy assistance may be needed based on new metrics.
+
+Although they are the states with the highest Nh, California (Nh=59) and Colorado (Nh=63) are not immune to these problems and likely represent a greater spread and diversity of energy affordability impacts. Likely,
+this diversity captures the benefits accrued by early adopters and the challenges of having high populations of those struggling with energy poverty and high housing costs. In many of these places, residents have self-sorted into geographic areas based on the overall costs of living. Also, advances in clean energy legislation are a common thread among the top-performing states on an Nh basis, signaling the value of strong decarbonization targets and accompanying policies to ensure electricity affordability for low-income households.
+
+Visualizing the proportion of end-use energy sourced from the combustion of fossil fuels in Figure 5 shows that such reliance does not necessarily lead to a more affordable system for energy consumers. Households in states with a high proportion of fossil fuel are no less likely to have high Nhs than those in other states that rely on clean energy, defying the conventional wisdom that fossil fuel consumption is a chosen tradeoff between environmental health and affordability for citizens.
+}

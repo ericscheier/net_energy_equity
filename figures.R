@@ -80,7 +80,7 @@ density_chart <- function(graph_data,
     # combine
     legend_title <- paste0(paste(legend_title, sep=" ", collapse=" &\n"))
   }
-  print(legend_title)
+  # print(legend_title)
   
   if(!is.null(group_columns)){
     pal_n <- length(levels(interaction(graph_data[,group_columns])))
@@ -489,9 +489,11 @@ choropleth_map <- function(
   include_basemap=TRUE,
   legend_position=c(0.15, 0.125),
   include_compass=FALSE,
-  metric_long_name=NULL
+  metric_long_name=NULL,
+  include_borders=FALSE,
+  border_field="state_fips"
 ){
-  # cloropleth map by census tract
+  
   clean_data <- st_transform(clean_data, 4326)
   b <- st_bbox(clean_data,crs=3857)
   names(b) <- c("left","bottom","right","top")
@@ -509,7 +511,7 @@ choropleth_map <- function(
   # centroids <- centroids[is.finite(rowSums(centroids)),]
   
   # center_centroid <- st_centroid()
-  map_data <- clean_data[,c("metric_mean", "geometry", "state_fips")]
+  map_data <- clean_data[,c("metric_mean", "geometry", border_field)]
   
   basemap <- ggplot()
   
@@ -531,28 +533,38 @@ choropleth_map <- function(
             size=0.1,
             # color=NA,#"white"
             alpha=0.8,
-            inherit.aes = FALSE), dpi=300, dev=NULL) #+ 
-    geom_sf(data = map_data %>% group_by(state_fips) %>% summarise(),
-            fill = "transparent", 
-            color = "#7B7D7B", #"gray20",
-            size = 0.075,
-            inherit.aes = FALSE
-            ) #+
+            inherit.aes = FALSE), dpi=300, dev=NULL) 
+  if(include_borders==TRUE){
+    o <- o   + 
+      geom_sf(data = map_data %>% group_by(!!as.name(border_field)) %>% summarise(),
+              fill = "transparent", 
+              color = "#626462", #"gray20",
+              size = 0.075,
+              inherit.aes = FALSE
+      )
+  }
+
+   #+
     # coord_sf(crs = 4326, #26945, #
     #          xlim = c(b['left'], b['right']),
     #          ylim = c(b['bottom'], b['top']),
     #          expand = TRUE)
   
-  color_values <- as.numeric(sort(c(
-    # weighted_metrics$metric_lower,
-    weighted_metrics$metric_min,
-    metric_cutoff_level,
-    weighted_metrics$metric_mean,
-    weighted_metrics$metric_max
-    # weighted_metrics$metric_upper
-  ), decreasing=F))
+  color_levels <- list(
+    #min=weighted_metrics$metric_min,
+    lqnt=weighted_metrics$metric_lower,
+    threshold=metric_cutoff_level,
+    mean=weighted_metrics$metric_mean,
+    median=weighted_metrics$metric_median,
+    uqnt=weighted_metrics$metric_upper#,
+    #max=weighted_metrics$metric_max
+  )
   
-  color_values <- scales::rescale(x=color_values, to=c(0,1))
+  color_levels <- color_levels[order(unlist(color_levels),decreasing = F)] #as.numeric(sort.list(color_levels, decreasing=F))
+  
+  color_values <- scales::rescale(x=unlist(color_levels), to=c(0,1))
+  
+  breaks <- unlist(color_levels[c("threshold","mean")])
   
   p <- o +
     # geom_polygon(data = spdf_fortified, 
@@ -571,10 +583,10 @@ choropleth_map <- function(
                  "#2CB2B2",
                  "#2C6FB2",
                  "#2C2CB2"),
-      limits = c(weighted_metrics$metric_lower,weighted_metrics$metric_upper),
+      limits = c(min(unlist(color_levels)),max(unlist(color_levels))),
       values = color_values,
       na.value = "#B3B3B3",
-      guide = FALSE,
+      guide = "none",
       name=FALSE
     )+
     scale_fill_gradientn(
@@ -584,11 +596,17 @@ choropleth_map <- function(
                  "#2CB2B2",
                  "#2C6FB2",
                  "#2C2CB2"),
-      limits = c(weighted_metrics$metric_lower,weighted_metrics$metric_upper),
+      limits = c(min(unlist(color_levels)),max(unlist(color_levels))),
       values = color_values,
       na.value = "#B3B3B3",
+      breaks=breaks,
+      labels=paste0(names(breaks),": ",to_percent(energy_burden_func(breaks+1,1))),
       guide = guide_colorbar(direction="horizontal",
-                             title.position = 'top'),
+                             title.position = 'top',
+                             label.theme = element_text(angle = -45, 
+                                                        hjust=0,
+                                                        vjust=1,
+                                                        size=8)),
       name=guide_name) +
     labs(
       title = chart_title,
@@ -678,8 +696,8 @@ make_all_charts <- function(clean_data,
                             group_columns,
                             metric_name,
                             metric_label=NULL, 
-                            metric_cutoff_level,
-                            metric_cutoff_label,
+                            metric_cutoff_level=0,
+                            metric_cutoff_label=NULL,
                             upper_quantile_view=1.0,
                             lower_quantile_view=0.0,
                             chart_title=NULL,
@@ -758,7 +776,7 @@ scatter_chart <- function(graph_data,
     # combine
     legend_title <- paste0(paste(legend_title, sep=" ", collapse=" &\n"))
   }
-  print(legend_title)
+  # print(legend_title)
   
   if(!is.null(group_columns)){
     pal_n <- length(levels(interaction(graph_data[,group_columns])))
@@ -832,3 +850,4 @@ scatter_chart <- function(graph_data,
     labs(title = NULL, x=NULL, y=NULL) + 
     plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4))
 }
+

@@ -1,0 +1,320 @@
+---
+title: Estimating Community Net Burdens of Housing and Transportation Energy in
+  American Homes
+author: "Eric Scheier"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo=FALSE,
+  message=FALSE,
+  warning=FALSE,
+  include=FALSE
+  )
+
+library(tidyverse)
+library(knitr)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+
+source("sources.R")
+```
+
+```{r}
+metric_name="ner"
+```
+
+
+```{r load-data}
+clean_data_ami_all <- read_csv("CohortData_AreaMedianIncome.csv")
+clean_data_fpl_all <- read_csv("CohortData_FederalPovertyLine.csv")
+replica_sup <- read_csv("CensusTractData.csv") #get_replica_supplemental_dataset()
+
+census_tracts_shp <- get_tract_shapefiles(
+    states="all",
+    acs_version=acs_version,
+    refresh=refresh,
+    return_files=TRUE,
+    all_from_list=unique(replica_sup$state_abbr)
+  )
+
+clean_data_ami_all_sup <- left_join(clean_data_ami_all, replica_sup, by=c("geoid"))
+clean_data_fpl_all_sup <- left_join(clean_data_fpl_all, replica_sup, by=c("geo_id"="geoid"))
+
+clean_data_ami_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_ami_all_sup, by=c("gisjoin")))
+clean_data_fpl_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_fpl_all_sup, by=c("gisjoin")))
+```
+
+```{r}
+
+```
+
+
+```{r}
+d_base <- make_all_charts(
+  clean_data=clean_data_ami_all_sup, 
+  group_columns=c(NULL),
+  metric_name="ner", 
+  metric_cutoff_level = ner_func(1,0.6),
+  metric_cutoff_label= NULL
+)[["density"]]
+
+d_base
+```
+
+
+```{r}
+d_base + theme_minimal() +
+    coord_flip()
+```
+```{r}
+clean_data=clean_data_ami_all_sup
+  group_columns=c(NULL)
+  metric_name="ner"
+  metric_cutoff_level = ner_func(1,0.6)
+  # metric_cutoff_label= NULL
+  
+#make_all_charts
+#clean_data,
+                            # group_columns,
+                            # metric_name,
+                            metric_label=NULL
+                            # metric_cutoff_level=0,
+                            metric_cutoff_label=NULL
+                            upper_quantile_view=1.0
+                            lower_quantile_view=0.0
+                            chart_title=NULL
+                            chart_subtitle=NULL
+                            chart_caption=NULL
+                            x_label="Proportion of Households"
+  
+  
+  graph_data <- filter_graph_data(clean_data, group_columns, metric_name)
+                        # density_chart
+                          # graph_data, 
+                          # metric_name, 
+                          # metric_label=NULL
+                          # group_columns, 
+                          # metric_cutoff_level, 
+                          # metric_cutoff_label,
+                          # upper_quantile_view=1,
+                          # lower_quantile_view=0,
+                          # chart_title=NULL, 
+                          # chart_subtitle=NULL,
+                          # chart_caption=NULL,
+                          # x_label="Proportion of Households"
+  
+  if(is.null(metric_label)){
+    metric_label <- toupper(metric_name)
+  }
+  
+  legend_title <- group_columns
+  if(!is.null(legend_title)){
+    # remove simplified_
+    legend_title <- gsub("simplified_","", legend_title, fixed=TRUE)
+    # normalize words
+    legend_title <- gsub("_"," ",legend_title,fixed=TRUE)
+    legend_title <- str_to_title(legend_title)
+    # combine
+    legend_title <- paste0(paste(legend_title, sep=" ", collapse=" &\n"))
+  }
+  # print(legend_title)
+  
+  if(!is.null(group_columns)){
+    pal_n <- length(levels(interaction(graph_data[,group_columns])))
+  } else {
+    pal_n <- 1
+  }
+  
+  graph_data$group_name <- str_to_title(gsub("+"," &\n",
+                                             graph_data$group_name,fixed=TRUE))
+  
+  movie <- "Darjeeling1" #"GrandBudapest1"
+  #pal <- wes_palette(name=movie, n=pal_n, type="continuous")
+  pal <- rev(sample(x=wes_palette(name=movie, n=pal_n, type="continuous"),
+                size = pal_n,
+                replace = FALSE))
+  
+  weighted_metrics <- calculate_weighted_metrics(graph_data, 
+                                                 group_columns, 
+                                                 metric_name, 
+                                                 metric_cutoff_level, 
+                                                 upper_quantile_view, 
+                                                 lower_quantile_view)
+  
+  
+  chart <- graph_data %>% #subset(!is.na(households)) %>% head()
+    # ggplot(aes(x=!!sym(metric_name), 
+    #            weight=group_household_weights,
+    #            color=interaction(!!!sym(group_columns)),
+    #            fill=interaction(!!!sym(group_columns))
+    # )) + 
+    ggplot(aes_string(x=metric_name, 
+                      weight="group_household_weights",
+                      color=if(is.null(group_columns)){group_columns}else{
+                        "group_name"
+                        #interaction(!!!sym(group_columns))
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                      },
+                      fill=if(is.null(group_columns)){group_columns}else{
+                        #interaction(!!!sym(group_columns))
+                        "group_name"
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                      },
+                      linetype=if(is.null(group_columns)){group_columns}else{
+                        #interaction(!!!sym(group_columns))
+                        "group_name"
+                        # paste0("interaction(", paste0(group_columns, collapse =  ", "), ")")
+                      }
+    )) + 
+    ggrastr::rasterise(stat_ewcdf(geom='line',  
+                                  alpha=1, 
+                                  na.rm=T, 
+                                  show.legend = NA, 
+                                  size=0.2),
+                       dpi=300
+                       ) + 
+    # ggrastr::rasterise(stat_ewcdf(aes(ymin=..y.., ymax=1), geom='ribbon', alpha=.1, 
+               # na.rm=T, show.legend = NA)) + 
+    theme_minimal() + 
+    scale_color_manual(name=legend_title, values=pal) + 
+    scale_fill_manual(name=legend_title, values=pal) + 
+    scale_linetype(name=legend_title) + 
+    theme(legend.justification = c(0, 1), 
+          legend.position = c(0, 1), 
+          legend.title=element_text(size=8),#element_blank(),
+          legend.text=element_text(size=6), 
+          legend.key.size = unit(10, "points"),
+          legend.spacing.y = unit(0.05, 'points'),
+          panel.background = element_blank(),#element_rect(fill="#f1f1f1"),
+          panel.grid.major = element_blank(),#element_line(color="#DCDCDC"),
+          panel.grid.minor = element_blank(),#element_line(color="#DCDCDC"),
+          axis.line = element_line(color = "black",
+                                   size = 0.5, 
+                                   linetype = "solid"),
+          axis.text.x=element_text(angle=45, 
+                                   hjust=1,
+                                   vjust=NULL,
+                                   margin=margin(t = 5, 
+                                                 r = 0, 
+                                                 b = 0, 
+                                                 l = 0, 
+                                                 unit = "pt")),
+          axis.text.y=element_text(angle=10, 
+                                   hjust=1,
+                                   vjust=0.5,
+                                   margin=margin(t = 0, 
+                                                 r = 5, 
+                                                 b = 0, 
+                                                 l = 0, 
+                                                 unit = "pt")),
+          axis.title.x = element_text(face="bold"),
+          axis.ticks=element_line(color = "black"),
+          axis.ticks.length = unit(-0.1, "cm")) + 
+    # guides(guide_legend(override.aes = list(size = .01))
+    guides(guide_legend(override.aes = list(size = 0.05))#,
+           # fill = guide_legend(override.aes = list(size = 0)),
+           # linetype = guide_legend(override.aes = list(size = 0)),
+           # ribbon = guide_legend(override.aes = list(size = 0))
+    ) + 
+    # geom_segment(y = 0,
+    #              x = as.numeric(weighted_medians[weighted_medians$group=="All",c("median_eroi")]),
+    #              yend = 0.5,
+    #              xend = as.numeric(weighted_medians[weighted_medians$group=="All",c("median_eroi")]),
+    #              color="gray25",
+    #              linetype="dotted",
+    #              size=0.25,
+    #              alpha=0.5) +
+    # geom_segment(y = 0.5,
+    #              x = as.numeric(weighted_medians[weighted_medians$group=="All",c("median_eroi")]),
+    #              yend = 0.5,
+  #              xend = 0,
+  #              color="gray25",
+  #              linetype="dotted",
+  #              size=0.25,
+  #              alpha=0.5) +
+  geom_vline(xintercept = metric_cutoff_level,
+             linetype="dotted",
+             color = "red",
+             size=0.5,
+             alpha=0.75) +
+    annotate("text",
+             y = 0.95,#1,
+             x = metric_cutoff_level*1.15,
+             angle = 0,
+             color="red",
+             label = metric_cutoff_label,
+             vjust = 0.0,#-0.25,
+             hjust = 1.0,
+             parse = FALSE,
+             alpha=0.75,
+             size=2.5) +
+    # annotate("text", 
+    #          y = 0, 
+    #          x = max(weighted_medians$median_eroi), 
+    #          angle = 0, 
+    #          color="gray25", 
+    #          label = "Median", 
+    #          vjust = -0.25, 
+    #          hjust = -0.1, 
+    #          parse = FALSE, 
+    #          alpha=0.75) + 
+    labs(
+      title=chart_title,
+      subtitle=chart_subtitle,
+      caption=chart_caption
+      ) #
+  
+  prechart<-chart
+```
+
+
+```{r}
+if(FALSE==TRUE){
+  
+    chart <- prechart + 
+      scale_x_continuous(#labels = scales::dollar_format(accuracy=1),
+                       breaks=seq(from=0,to=120,by=20), 
+                       # minor_breaks=seq(from=0,to=20,by=.25),
+                       name=metric_label) + 
+    scale_y_continuous(labels = scales::label_percent(accuracy = 1), 
+                       breaks=seq(from=0,to=1,by=.25), 
+                       # minor_breaks=seq(from=0,to=1,by=.05),
+                       name=x_label) + 
+    coord_flip(xlim=c(0,120),
+               ylim=c(0,1),
+               expand=FALSE)}
+if ( TRUE ) {
+    chart <- prechart + 
+      scale_y_continuous(
+        labels=scales::label_percent(accuracy=1)
+      ) +
+      coord_cartesian(
+        xlim=c(0,120),
+        ylim=c(0,1),
+      expand=FALSE
+      )
+}
+  
+# chart  + geom_histogram(
+#   binwidth = 1
+#   # aes(y = ..density.., )
+# )
+
+graph_data_cut = graph_data %>%
+  group_by(round(ner,0)) %>%
+  summarise (
+    n = n(),
+    homes = sum(households)
+    ) %>%
+  mutate(freq = (n*homes / sum(n*homes))
+
+ggplot(data=graph_data_cut, aes(x = ner, y=group_percentile)) + 
+  geom_bar(stat="identity",position="dodge") + 
+  # scale_x_discrete(labels = breaks) +  
+  ylab("Percentage") +
+  xlab("Percent")
+```
+

@@ -1,10 +1,14 @@
-compare_metrics <- function(metric_name="ner",
-                            dataset=NULL
+compare_metrics <- function(
+    metric_name,
+    groups,
+    input_dataset=NULL,
+    metric_cutoff_level=0,
+    ...
 ){
-  gwm <- calculate_weighted_metrics(filter_graph_data(dataset,c("income_bracket"),metric_name),
-                                    c("income_bracket"),
+  gwm <- calculate_weighted_metrics(filter_graph_data(input_dataset,groups,metric_name),
+                                    groups,
                                     metric_name,
-                                    metric_cutoff_level=0,
+                                    metric_cutoff_level=metric_cutoff_level,
                                     upper_quantile_view = 1,
                                     lower_quantile_view=0)
   gwm$metric_name <- metric_name
@@ -18,16 +22,19 @@ create_comparison_table <- function(
                          "net_income"#,
                          # "ner"
     ),
-    dataset=NULL,
-    include_totals=TRUE
+    groups=c("income_bracket"),
+    input_dataset=NULL,
+    include_totals=TRUE,
+    metric_name="ner"
 ){
   minimum_metrics_to_compare <- c("income","energy_cost","net_income")
   
   metrics_to_compare <- unique(c(metrics_to_compare,minimum_metrics_to_compare))
   
-  compare_table_wide <- data.table::rbindlist(lapply(metrics_to_compare, 
-                                                     compare_metrics,
-                                                     dataset=dataset))
+  compare_table_wide <- data.table::rbindlist(lapply(X=metrics_to_compare, 
+                                                     FUN=compare_metrics,
+                                                     groups=groups,
+                                                     input_dataset=input_dataset))
   
   
   compare_table_long <- compare_table_wide %>% 

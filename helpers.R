@@ -137,8 +137,12 @@ to_big <- function(x){
   return(y)
 }
 
-to_million <- function(x, suffix=" million"){
-  y <- scales::label_number(accuracy = 0.1, suffix = suffix)(x * 10^-6)
+to_million <- function(x, suffix=" million", override_to_k=TRUE){
+  if(abs(x)<10^6){
+    y <- scales::label_number(accuracy = 1, suffix = "k")(x * 10^-3)
+  } else {
+    y <- scales::label_number(accuracy = 0.1, suffix = suffix)(x * 10^-6)
+  }
   y[is.na(x)] <- ""
   return(y)
 }

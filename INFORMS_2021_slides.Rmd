@@ -28,7 +28,11 @@ library(kableExtra)
 
 version_path <- "net_energy_equity_major_review_files"
 
-knitr::opts_chunk$set(echo=FALSE)
+knitr::opts_chunk$set(
+  echo=FALSE,
+  message=FALSE,
+  warning=FALSE
+  )
 ```
 
 # Energy Affordability is Inequitable in the US

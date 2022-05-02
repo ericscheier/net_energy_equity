@@ -1,0 +1,130 @@
+---
+title: "Power Safety Shutoffs"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+Ideas:
+
++ Who is more likely to experience a power safety shutoff
++ Weighting by time and severity of shutoffs
++ Use shapefile to cross reference with LEAD extrapolation, and HDI file
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo=FALSE,
+  message=FALSE,
+  warning=FALSE,
+  include=FALSE
+  )
+
+library(tidyverse)
+library(knitr)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+
+source("sources.R")
+```
+
+```{r}
+metric_name="ner"
+```
+
+
+```{r load-data}
+clean_data_ami_all <- read_csv("CohortData_AreaMedianIncome.csv")
+clean_data_fpl_all <- read_csv("CohortData_FederalPovertyLine.csv")
+replica_sup <- read_csv("CensusTractData.csv") #get_replica_supplemental_dataset()
+
+census_tracts_shp <- get_tract_shapefiles(
+    states="all",
+    acs_version=acs_version,
+    refresh=refresh,
+    return_files=TRUE,
+    all_from_list=unique(replica_sup$state_abbr)
+  )
+
+clean_data_ami_all_sup <- left_join(clean_data_ami_all, replica_sup, by=c("geoid"))
+clean_data_fpl_all_sup <- left_join(clean_data_fpl_all, replica_sup, by=c("geo_id"="geoid"))
+
+clean_data_ami_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_ami_all_sup, by=c("gisjoin")))
+clean_data_fpl_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_fpl_all_sup, by=c("gisjoin")))
+```
+
+```{r}
+require(sf)
+psps <- sf::st_read("PGE_POSTSR2A_3-1-2022.gdb")
+psps
+```
+
+```{r preprocessing}
+clean_data_ami_all_sup_shp$neb <- clean_data_ami_all_sup_shp$ner^(-1)
+
+clean_data_ami <- clean_data_ami_all_sup_shp %>%
+                                  filter(
+                                    # as.numeric(geoid) %in% psps$Tract
+                                    company_na %in% c("Pacific Gas & Electric Co")
+                                  )
+
+neb_poverty_line <- 0.06
+
+metric_name <- "neb"
+
+# gwm <- calculate_weighted_metrics(filter_graph_data(clean_data_ami_all,
+#                                                     c("geoid"),
+#                                                     metric_name),
+#                            c("geoid"),
+#                            metric_name,
+#                            metric_cutoff_level=neb_poverty_line,
+#                            upper_quantile_view = 1,
+#                            lower_quantile_view=0)
+# 
+# gwm$metric_name <- metric_name
+# 
+# psps_ami <- st_sf(left_join(psps, gwm %>% mutate(Tract=as.numeric(as.character(geoid))), by=c("Tract")))
+
+clean_data_ami_pge_sup_shp_psps <- st_sf(left_join(clean_data_ami %>% mutate(Tract=as.numeric(as.character(geoid))), st_drop_geometry(psps), by=c("Tract")))
+
+clean_data_ami_pge_sup_shp_psps$has_psps <- !is.na(clean_data_ami_pge_sup_shp_psps$TotCustomer)
+```
+
+
+```{r}
+ggplotRegression <- function (fit) {
+
+require(ggplot2)
+
+ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) + 
+  geom_point() +
+  stat_smooth(method = "lm", col = "red") +
+  labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                     "Intercept =",signif(fit$coef[[1]],5 ),
+                     " Slope =",signif(fit$coef[[2]], 5),
+                     " P =",signif(summary(fit)$coef[2,4], 5)))
+}
+```
+
+
+```{r}
+ggplotRegression(lm(has_psps~neb, data = clean_data_ami_pge_sup_shp_psps, weights = households))
+```
+
+```{r}
+make_all_charts(
+  clean_data=psps_map_data, 
+  metric_name="ner", 
+  group_columns=c("geo_id"),
+  metric_cutoff_level = ner_func(1,0.6)
+)[["density"]]
+```
+
+```{r}
+summary(glm(has_psps~neb, data = clean_data_ami_pge_sup_shp_psps, weights = households))
+```
+
+
+
+
+
+
