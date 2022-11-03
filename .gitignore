@@ -108,7 +108,7 @@ venv.bak/
 *.Rproj
 *cache
 *.Rhistory
-.RData
+*.RData
 
 # Data
 data/
@@ -144,8 +144,11 @@ data/
 *.odt
 *.jpg
 *.jpeg
+*.svg
 
 *.aux
 *.synctex.gz
 
 config.yml
+
+rsconnect/
