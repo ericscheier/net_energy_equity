@@ -1,0 +1,39 @@
+---
+title: "Household Energy Burdens"
+author: "Eric Scheier"
+date: "`r Sys.Date()`"
+output: 
+  powerpoint_presentation:
+    reference_doc: scp.pptx
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+poster_results <- readRDS("poster_results.RData")
+```
+
+## Intro
+
+![](doe_eere_logo.jpg)   ![](scp_logo.svg)
+
+## Net Energy Burden
+
+\[G = Gross\ Income\ ;\ S = Spending\ on\ Energy\]
+
+\[
+Net\ Energy\ Burden\ (E^{n}_{b}) = N^{-1}_{h} = \frac{S}{G - S}
+\]
+
+\[E_{B}^{*} = \frac{S}{G} = 6\%\ \Rightarrow \ E^{n*}_{b} \approx 6\%\ ;\ N_{h}^{*} \approx 16\]
+
++ **1 in `r round(poster_results$energy_poverty_prevalence,0)`** homes in the U.S. faces energy poverty.
++ **1 in `r round(poster_results$fpl_energy_poverty_prevalence,0)`** homes facing energy poverty is above the US Federal Poverty Line
++ **Solar** powered homes experience energy poverty **$\frac{1}{`r round(poster_results$solar_energy_poverty_denominator,0)`}$ as often** as other homes
+
+## Energy Burden Landscape
+
+![](poster_map.svg)
+## SCP Service Area
+
+![](scp_poster_map.svg)

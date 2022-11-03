@@ -1,7 +1,7 @@
 filter_graph_data <- function(clean_data, group_columns, metric_name){
   graph_data <- clean_data %>% 
     {if(!is.null(group_columns)) group_by_at(., .vars=vars(all_of(group_columns))) else .} %>% 
-    mutate(group_households = sum(households)) %>% 
+    mutate(group_households = sum(households, na.rm = TRUE)) %>% 
     mutate(group_household_weights = ifelse(group_households==0,0,households/group_households)) %>% 
     arrange(!!sym(metric_name)) %>% 
     mutate(group_percentile = cumsum(households * group_household_weights),

@@ -1,0 +1,44 @@
+---
+title: "Identifying At-Risk Communities"
+author: "Eric Scheier"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# PSPS
+
+See psps.rmd
+
+# Weather-caused Power Outage
+
+? PG&E data
+? 
+
+# FEMA National Risk Index Factors
+
++ Avalanche
++ Coastal Flooding
++ Cold Wave
++ Drought
++ Earthquake
++ Hail
++ Heat Wave
++ Hurricane
++ Ice Storm
++ Landslide
++ Lightning
++ Riverine Flooding
++ Strong Wind
++ Tornado
++ Tsunami
++ Volcanic Activity
++ Wildfire
++ Winter Weather
+
+https://hazards.fema.gov/nri/data-resources#shpDownload
+
+```{r}
+"NRI_Shapefile_CensusTracts" #shp
+"NRI_Shapefile_Tribal_CensusTracts" #shp
+```
+

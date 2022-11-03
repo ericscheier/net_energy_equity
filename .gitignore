@@ -111,6 +111,7 @@ venv.bak/
 .RData
 
 # Data
+data/
 *.cpg
 *.dbf
 *.prj
@@ -140,6 +141,7 @@ venv.bak/
 *.tex
 *.png
 *.docx
+*.odt
 *.jpg
 *.jpeg
 

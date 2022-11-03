@@ -1,0 +1,51 @@
+---
+title: "Value of DER"
+author: "Eric Scheier"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Technologies
+
+## electric vehicles
+## electric vehicle charging stations
+## solar systems
+### behind-the-meter
+#### net metered
+#### zero backfeed
+### distribution-interconnected
+### transmission-interconnected
+## battery storage
+### standalone
+### paired with solar
+### paired with [x]
+## thermostats
+## heat pump water heaters
+## heat pump HVAC systems
+## other smart home appliances
+## energy efficiency measures
+
+
+# Value Streams
+
+## energy
+## capacity
+## ancillary services
+## deferred upgrades
+### distribution 
+### transmission
+## resilience
+## subsidy
+### programs
++ DSIRE
+  https://www.dsireusa.org/resources/data-and-tools/
+  http://programs.dsireusa.org/api/v1/getprograms/json
+  http://virtuoso.dsireusa.org:8890/sparql
+  https://www.w3.org/TR/sparql11-query/
+### rate tariffs
+
+# Technical Capacity
+
+# Program Designs
+
+# Deployment Scenarios

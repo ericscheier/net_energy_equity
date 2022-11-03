@@ -22,11 +22,6 @@ library(kableExtra)
 source("sources.R")
 ```
 
-```{r}
-metric_name="ner"
-```
-
-
 ```{r load-data}
 clean_data_ami_all <- read_csv("CohortData_AreaMedianIncome.csv")
 clean_data_fpl_all <- read_csv("CohortData_FederalPovertyLine.csv")
@@ -39,52 +34,241 @@ census_tracts_shp <- get_tract_shapefiles(
     return_files=TRUE,
     all_from_list=unique(replica_sup$state_abbr)
   )
+```
 
-clean_data_ami_all_sup <- left_join(clean_data_ami_all, replica_sup, by=c("geoid"))
-clean_data_fpl_all_sup <- left_join(clean_data_fpl_all, replica_sup, by=c("geo_id"="geoid"))
+```{r preprocessing}
+clean_data_ami_all$neb <- clean_data_ami_all$ner^-1
+clean_data_fpl_all$neb <- clean_data_fpl_all$ner^-1
+
+clean_data_ami_all_sup <- left_join(clean_data_ami_all, replica_sup, by=c("geoid","state_abbr",
+                                                                          "state_fips",
+                                                                          "company_ty",
+                                                                          "locale"))
+clean_data_fpl_all_sup <- left_join(clean_data_fpl_all, replica_sup, by=c("geo_id"="geoid",
+                                                                          "state_abbr",
+                                                                          "state_fips"
+                                                                          ))
 
 clean_data_ami_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_ami_all_sup, by=c("gisjoin")))
 clean_data_fpl_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_fpl_all_sup, by=c("gisjoin")))
 ```
 
 ```{r}
+clean_data_ami_all_sup_shp_scp <- clean_data_ami_all_sup_shp %>% filter(state_abbr=="CA", 
+                                         county_name %in% 
+                                           c("Sonoma County",
+                                             "Mendocino County"),
+                                         company_na %in% c("Pacific Gas & Electric Co",
+                                                           "Trinity Public Utilities District")
+                                         )
+```
 
+```{r}
+metric_name <- "neb"
+
+energy_burden_poverty_line <- 0.06
+ner_poverty_line <- ner_func(g = 1,s = energy_burden_poverty_line)
+metric_cutoff_level <- (ner_poverty_line)^-1
+
+metric_long_name <- "Net\nEnergy\nBurden" # bquote(E[b]^n)
+metric_label <- bquote(E[b]^n) # "%"
+
+# as.expression(bquote(~italic(nE[b])~": Energy Burden"))
+```
+
+```{r}
+weighted_metrics <- calculate_weighted_metrics(st_drop_geometry(clean_data_ami_all_sup_shp), 
+                                                   group_columns=c(NULL), 
+                                                   metric_name=metric_name, 
+                                                   metric_cutoff_level=metric_cutoff_level, 
+                                                   upper_quantile_view=0.95, 
+                                                   lower_quantile_view=0.05)
+
+color_levels <- list(
+    Min=weighted_metrics$metric_min,
+    lqnt=weighted_metrics$metric_lower,
+    Threshold=metric_cutoff_level,
+    Average=weighted_metrics$metric_mean,
+    Median=weighted_metrics$metric_median,
+    uqnt=weighted_metrics$metric_upper,
+    Max=weighted_metrics$metric_max
+  )
+  
+  color_levels <- color_levels[order(unlist(color_levels),decreasing = F)] #as.numeric(sort.list(color_levels, decreasing=F))
+  
+  if(metric_name!="ner"){
+    color_levels <- lapply(color_levels, function(x){return(max(min(x,1),0))})
+  }
+  
+  color_values <- scales::rescale(x=unlist(color_levels), to=c(0,1))
+  
+  breaks <- unlist(color_levels[c(
+    "Min",
+    "Threshold",
+    "Average",
+    "Median",
+    "Max"
+    )])
+  
+  # legend_colors <- c(
+  #   "#B22C2C",
+  #   "#B22C2C",
+  #                    "#B26F2C",
+  #                    "#B2B22C",
+  #                    "#2CB2B2",
+  #                    "#2C6FB2",
+  #                    "#2C2CB2",
+  #   "#2C2CB2"
+  #   )
+  legend_colors <- as.character(rev(wes_palette("Zissou1", 7, type = "continuous")))
+  
+  scale_limits <- c(min(unlist(color_levels)),max(unlist(color_levels)))
+  
+  if(flip_scale==TRUE){
+    # color_levels <- rev(color_levels)
+    # color_values <- rev(color_values)
+    # breaks <- rev(breaks)
+    legend_colors <- rev(legend_colors)
+    # scale_limits <- rev(scale_limits)
+  }
 ```
 
 
 ```{r}
-d_base <- make_all_charts(
-  clean_data=clean_data_ami_all_sup, 
+poster_charts <- make_all_charts(
+  clean_data=clean_data_ami_all_sup_shp_scp, #clean_data_ami_all_sup_shp_scp, #
   group_columns=c(NULL),
-  metric_name="ner", 
-  metric_cutoff_level = ner_func(1,0.6),
-  metric_cutoff_label= NULL
-)[["density"]]
+  metric_name=metric_name, 
+  metric_label=metric_label,
+  metric_long_name=metric_long_name,
+  metric_cutoff_level = metric_cutoff_level,
+  metric_cutoff_label= NULL,
+  weighted_metrics_data = clean_data_ami_all_sup_shp,
 
-d_base
+  upper_quantile_view=0.95,
+  lower_quantile_view=0.05,
+  
+  chart_title=NULL,
+  chart_subtitle=NULL,
+  chart_caption=NULL,
+  x_label="Proportion of Households",
+  
+  border_field = "state_fips", #"state_fips",
+  include_basemap = "toner-hybrid",
+  keep_coordinates = FALSE,
+  infer_missing="max"
+)
+
+print(poster_charts[["choropleth"]])
+
+
+               # theme(
+                 # text  = element_text(size = 20),
+                 # legend.background = element_rect(fill="green")
+                 # legend.background = element_rect(fill="green", color=NULL),
+                 # legend.title = element_text(size = 16, colour = "red"),
+                 # legend.text  = element_text(size = 8, color = "blue")
+```
+
+
+
+```{r}
+# C:\Users\Eric Scheier\Documents\apps\net_energy_equity\f8612018\Utility_Data_2018.xlsx
+# merge states and territories tabs
+# join with clean data on state_abbr and eia utility number
+# limit to census tracts in SERC
+
+clean_data_ami_all_sup_shp_serc <- clean_data_ami_all_sup_shp %>% 
+  filter(state_abbr %in% 
+           c("AL", #Alabama, 
+             "GA", #Georgia, 
+             "MS", #Mississippi, 
+             "MO", #Missouri, 
+             "NC", #North Carolina, 
+             "SC", #South Carolina, 
+             "TN", #Tennessee, 
+             #and portions of 
+             "AR", #Arkansas, 
+             "IL", #Illinois, 
+             "KY", #Kentucky, 
+             "LA", #Louisiana, 
+             "OK", #Oklahoma, 
+             "TX", #Texas, 
+             "VA", #Virginia, 
+             "FL" #Florida, 
+             )
+                                         )
+```
+
+```{r}
+clean_data_ami_all_sup_shp_continent <- 
+  clean_data_ami_all_sup_shp %>% 
+  filter(!(state_abbr %in% c("HI","AK", NA)))
+```
+
+```{r}
+poster_charts <- make_all_charts(
+  clean_data=clean_data_ami_all_sup_shp_continent, #clean_data_ami_all_sup_shp, 
+  group_columns=c(NULL),
+  metric_name=metric_name, 
+  metric_label=metric_label,
+  metric_cutoff_level = metric_cutoff_level,
+  metric_cutoff_label= NULL,
+  weighted_metrics_data = clean_data_ami_all_sup_shp,
+
+  upper_quantile_view=1.0,
+  lower_quantile_view=0.0,
+  
+  chart_title=NULL,
+  chart_subtitle=NULL,
+  chart_caption=NULL,
+  x_label="Proportion of Households"
+)
+```
+
+```{r}
+print(poster_charts[["density"]])
+```
+
+```{r}
+print(poster_charts[["tree"]])
+```
+
+```{r}
+print(poster_charts[["violin"]])
+```
+
+```{r}
+poster_charts[["choropleth"]]
+```
+
+```{r}
+poster_charts[["dashboard"]]
 ```
 
 
 ```{r}
-d_base + theme_minimal() +
-    coord_flip()
+poster_charts[["metrics"]]
 ```
+
+
+
 ```{r}
 clean_data=clean_data_ami_all_sup
   group_columns=c(NULL)
-  metric_name="ner"
-  metric_cutoff_level = ner_func(1,0.6)
+  metric_name=metric_name
+  metric_cutoff_level = metric_cutoff_level
   # metric_cutoff_label= NULL
   
 #make_all_charts
 #clean_data,
                             # group_columns,
                             # metric_name,
-                            metric_label=NULL
+                            metric_label=metric_label
                             # metric_cutoff_level=0,
                             metric_cutoff_label=NULL
-                            upper_quantile_view=1.0
-                            lower_quantile_view=0.0
+                            upper_quantile_view=0.99
+                            lower_quantile_view=0.01
                             chart_title=NULL
                             chart_subtitle=NULL
                             chart_caption=NULL
@@ -239,7 +423,88 @@ clean_data=clean_data_ami_all_sup
              linetype="dotted",
              color = "red",
              size=0.5,
-             alpha=0.75) +
+             alpha=0.75) #
+  
+  prechart<-chart
+```
+
+
+```{r}
+if(metric_name=="ner"){
+  xlims <- c(0,120)
+  
+  x_scale <- scale_x_continuous(#labels = scales::dollar_format(accuracy=1),
+                       breaks=seq(from=xlims[1],to=xlims[2],by=20), 
+                       # minor_breaks=seq(from=0,to=20,by=.25),
+                       name=metric_label)
+} else{ #if(metric_name %in% c("neb","energy_burden")){
+  xlims <- c(floor(weighted_metrics$metric_lower*10)/10,ceiling(weighted_metrics$metric_upper*10)/10)
+  
+  x_scale <- scale_x_continuous(labels = scales::label_percent(accuracy = 1),
+                       breaks=seq(from=xlims[1],to=xlims[2],by=.1), 
+                       # minor_breaks=seq(from=0,to=20,by=.25),
+                       name=metric_label)
+}
+
+
+if(FALSE==TRUE){
+  
+    chart <- prechart + 
+      x_scale + 
+    scale_y_continuous(labels = scales::label_percent(accuracy = 1), 
+                       breaks=seq(from=0,to=1,by=.25), 
+                       # minor_breaks=seq(from=0,to=1,by=.05),
+                       name=x_label) + 
+    coord_flip(xlim=xlims,
+               ylim=c(0,1),
+               expand=FALSE)}
+if ( TRUE ) {
+    chart <- prechart + 
+      scale_y_continuous(
+        labels=scales::label_percent(accuracy=1)
+      ) +
+      coord_cartesian(
+        xlim=xlims,
+        ylim=c(0,1),
+      expand=FALSE
+      )
+}
+  
+# chart  + geom_histogram(
+#   binwidth = 1
+#   # aes(y = ..density.., )
+# )
+```
+
+
+```{r}
+graph_data_cut = graph_data %>%
+  group_by(binned_metric=round(!!!syms(metric_name),2)) %>%
+  summarise (
+    n = n(),
+    homes = sum(households)
+    ) %>%
+  mutate(group_percentile = (homes / sum(homes)))
+
+final_density_chart <- chart + 
+  geom_bar(data=graph_data_cut, 
+           aes(x = binned_metric, y = group_percentile), 
+           stat = "identity",
+           position = "dodge", 
+           alpha=0.25,
+           inherit.aes = FALSE) + 
+  # scale_x_discrete(labels = breaks) +  
+  ylab("Percentage of Homes") +
+  xlab(metric_label) +
+  x_scale +
+  scale_y_continuous(
+        labels=scales::label_percent(accuracy=1)
+      ) +
+      coord_cartesian(
+        xlim=xlims,
+        ylim=c(0,1),
+      expand=FALSE
+      ) + 
     annotate("text",
              y = 0.95,#1,
              x = metric_cutoff_level*1.15,
@@ -265,56 +530,125 @@ clean_data=clean_data_ami_all_sup
       title=chart_title,
       subtitle=chart_subtitle,
       caption=chart_caption
-      ) #
-  
-  prechart<-chart
+      )
+
+print(final_density_chart)
+```
+```{r}
+final_spending_pie_chart_data <- clean_data %>% 
+  pivot_longer(cols=c("electricity_spend","gas_spend","other_spend")) %>% 
+  group_by(name) %>%
+  summarise(value=sum(value*households)) %>% 
+  mutate(
+    pct=to_percent(value/sum(value))
+  )
+
+final_spending_pie_chart <- final_spending_pie_chart_data %>%
+  ggplot(aes(x="", 
+             y=value, 
+             # weight=households, 
+             fill=name,
+             # label=pct,
+             )) + geom_bar(stat="identity", width=1) +
+  coord_polar("y",start=0)
+
+print(final_spending_pie_chart)
+```
+```{r}
+library(treemapify)
+
+final_spending_tree_chart <- final_spending_pie_chart_data %>% 
+  ggplot(data=.,aes(area = value, 
+             fill = name,
+             label = paste(name, pct, sep = "\n\n"),
+             )) +
+  geom_treemap() + 
+  geom_treemap_text(colour = "white",
+                    place = "centre",
+                    size = 15) +
+  theme(legend.position = "none")
+
+print(final_spending_tree_chart)
 ```
 
 
 ```{r}
-if(FALSE==TRUE){
-  
-    chart <- prechart + 
-      scale_x_continuous(#labels = scales::dollar_format(accuracy=1),
-                       breaks=seq(from=0,to=120,by=20), 
-                       # minor_breaks=seq(from=0,to=20,by=.25),
-                       name=metric_label) + 
-    scale_y_continuous(labels = scales::label_percent(accuracy = 1), 
-                       breaks=seq(from=0,to=1,by=.25), 
-                       # minor_breaks=seq(from=0,to=1,by=.05),
-                       name=x_label) + 
-    coord_flip(xlim=c(0,120),
-               ylim=c(0,1),
-               expand=FALSE)}
-if ( TRUE ) {
-    chart <- prechart + 
-      scale_y_continuous(
-        labels=scales::label_percent(accuracy=1)
-      ) +
-      coord_cartesian(
-        xlim=c(0,120),
-        ylim=c(0,1),
-      expand=FALSE
-      )
-}
-  
-# chart  + geom_histogram(
-#   binwidth = 1
-#   # aes(y = ..density.., )
-# )
+# gwm <- calculate_weighted_metrics(filter_graph_data(clean_data,
+#                                                     c("geoid"),
+#                                                     metric_name),
+#                            c("geoid"),
+#                            metric_name,
+#                            metric_cutoff_level=0,
+#                            upper_quantile_view = 1,
+#                            lower_quantile_view=0) %>% 
+#   mutate(geoid=as.character(geoid))
+# 
+# gwm$metric_name <- metric_name
+# 
+# selected_map_data <- inner_join(census_tracts_shp, gwm, by=c("GEOID"="geoid"))
+# 
+# selected_map_data$geoid <- selected_map_data$GEOID
+# selected_map_data$households <- selected_map_data$household_count
+# 
+# selected_map_data[[metric_name]] <- selected_map_data$metric_mean
 
-graph_data_cut = graph_data %>%
-  group_by(round(ner,0)) %>%
-  summarise (
-    n = n(),
-    homes = sum(households)
-    ) %>%
-  mutate(freq = (n*homes / sum(n*homes))
+clean_top_metrics <- grouped_weighted_metrics(filter_graph_data(clean_data_ami_all, 
+                                                                group_columns=NULL,
+                                                                metric_name),# %>% 
+                                                #filter(!(state_abbr %in% c("HI","AK", NA))), 
+                         group_columns=NULL, 
+                         metric_name, 
+                         metric_cutoff_level, 
+                         upper_quantile_view=.995, 
+                         lower_quantile_view=0.005)
 
-ggplot(data=graph_data_cut, aes(x = ner, y=group_percentile)) + 
-  geom_bar(stat="identity",position="dodge") + 
-  # scale_x_discrete(labels = breaks) +  
-  ylab("Percentage") +
-  xlab("Percent")
+choropleth_chart <- choropleth_map(
+    clean_data=clean_data_ami_all_sup_shp, #selected_map_data,
+    group_columns,
+    metric_name,
+    metric_label="%",
+    metric_cutoff_level,
+    metric_cutoff_label,
+    upper_quantile_view,
+    lower_quantile_view,
+    chart_title=paste0("Net Energy Burdens in Selected Area"),
+    chart_subtitle=NULL,
+    weighted_metrics=clean_top_metrics,
+    include_basemap = FALSE,
+    include_compass = TRUE,
+    metric_long_name = bquote(E[b]^n),
+    include_borders=FALSE
+)
+
+final_map <- choropleth_chart
+ggsave("poster_map.svg", 
+       plot=final_map,
+       # device = NULL,
+       # path = NULL,
+        scale = 1,
+        width = 10,
+        height = 10,
+        units = "in", #c("in", "cm", "mm", "px"),
+        dpi = 300,
+        limitsize = TRUE,
+        bg = NULL
+       )
+print(final_map)
+```
+
+```{r}
+gt <- patchwork::wrap_plots((final_map)/(final_density_chart+final_spending_pie_chart)  + 
+                                 plot_layout(heights = c(1,1)))
+
+
+print(gt)
+```
+```{r}
+clean_data_ami_all_sup_shp
+```
+
+
+```{r}
+calculate_weighted_metrics(clean_data, NULL, metric_name, metric_cutoff_level)
 ```
 

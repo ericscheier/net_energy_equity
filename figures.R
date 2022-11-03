@@ -105,7 +105,7 @@ density_chart <- function(graph_data,
                                                  lower_quantile_view)
   
   
-  chart <- graph_data %>% #subset(!is.na(households)) %>% head()
+  chart <- graph_data %>% subset(!is.na(households)) %>% #head()
     # ggplot(aes(x=!!sym(metric_name), 
     #            weight=group_household_weights,
     #            color=interaction(!!!sym(group_columns)),
@@ -486,12 +486,17 @@ choropleth_map <- function(
   chart_title,
   chart_subtitle,
   weighted_metrics,
-  include_basemap=TRUE,
+  include_basemap="terrain", #maptype = c("terrain", "terrain-background", "terrain-labels", "terrain-lines", "toner", "toner-2010", "toner-2011", "toner-background", "toner-hybrid","toner-labels", "toner-lines", "toner-lite", "watercolor")
   legend_position=c(0.15, 0.125),
+  legend_direction="horizontal",
   include_compass=FALSE,
+  compass_location="bottomright",
   metric_long_name=NULL,
   include_borders=FALSE,
-  border_field="state_fips"
+  border_field=NULL,
+  flip_scale=FALSE,
+  keep_coordinates=TRUE,
+  infer_missing=FALSE
 ){
   
   clean_data <- st_transform(clean_data, 4326)
@@ -505,22 +510,52 @@ choropleth_map <- function(
   }
   
   #guide_name <- paste0(c("Average ",metric_long_name," (",metric_label,")"),collapse="")
-  guide_name <- as.expression(bquote("Average"~italic(
+  guide_name <- as.expression(bquote(~italic(
                                        .(metric_long_name))~
                                        "("*.(metric_label)*")"))
   # centroids <- centroids[is.finite(rowSums(centroids)),]
   
   # center_centroid <- st_centroid()
-  map_data <- clean_data[,c("metric_mean", "geometry", border_field)]
+  gwm <- calculate_weighted_metrics(filter_graph_data(st_drop_geometry(clean_data),
+                                                      c("geoid"),
+                                                      metric_name),
+                                    c("geoid"),
+                                    metric_name,
+                                    metric_cutoff_level=0,
+                                    upper_quantile_view = 1,
+                                    lower_quantile_view=0) %>% 
+    mutate(geoid=as.character(geoid))
+  
+  gwm$metric_name <- metric_name
+  
+  map_data <- left_join(clean_data, gwm, by=c("geoid"))[,c("metric_mean", "geometry", border_field)]
+  
+  if(infer_missing!=FALSE){
+    if(infer_missing=="max"){
+      map_data$metric_mean <- ifelse(is.na(map_data$metric_mean),
+                                max(map_data$metric_mean, na.rm=TRUE),
+                                map_data$metric_mean)
+    } else {
+      map_data$metric_mean <- ifelse(is.na(map_data$metric_mean),
+                                min(map_data$metric_mean, na.rm=TRUE),
+                                map_data$metric_mean)
+    }
+  }
+  
+  # map_data
+  # 
+  fill_transparency <- 1.0
   
   basemap <- ggplot()
   
-  if(include_basemap){
+  if(include_basemap!=FALSE){
+    
+    fill_transparency <- 0.6
     
     # https://stackoverflow.com/questions/52704695/is-ggmap-broken-basic-qmap-produces-arguments-imply-differing-number-of-rows
     basemap_files <- ggmap::get_stamenmap(bbox=b, 
                                 zoom=ggmap::calc_zoom(b, adjust=as.integer(0)),
-                                maptype="terrain")
+                                maptype=include_basemap)
     
     basemap_files <- ggmap_bbox(basemap_files)
     
@@ -532,11 +567,10 @@ choropleth_map <- function(
             aes(fill=metric_mean, color=metric_mean),
             size=0.1,
             # color=NA,#"white"
-            alpha=0.8,
+            alpha=fill_transparency,
             inherit.aes = FALSE), dpi=300, dev=NULL) 
   if(include_borders==TRUE){
-    o <- o   + 
-      geom_sf(data = map_data %>% group_by(!!as.name(border_field)) %>% summarise(),
+    o <- o + geom_sf(data = map_data %>% group_by(!!as.name(border_field)) %>% summarise(),
               fill = "transparent", 
               color = "#626462", #"gray20",
               size = 0.075,
@@ -551,74 +585,141 @@ choropleth_map <- function(
     #          expand = TRUE)
   
   color_levels <- list(
-    #min=weighted_metrics$metric_min,
-    lqnt=weighted_metrics$metric_lower,
-    threshold=metric_cutoff_level,
-    mean=weighted_metrics$metric_mean,
-    median=weighted_metrics$metric_median,
-    uqnt=weighted_metrics$metric_upper#,
-    #max=weighted_metrics$metric_max
+    Min=weighted_metrics$metric_min,
+    Lower=weighted_metrics$metric_lower,
+    Threshold=metric_cutoff_level,
+    Average=weighted_metrics$metric_mean,
+    Median=weighted_metrics$metric_median,
+    Upper=weighted_metrics$metric_upper,
+    Max=weighted_metrics$metric_max
   )
   
   color_levels <- color_levels[order(unlist(color_levels),decreasing = F)] #as.numeric(sort.list(color_levels, decreasing=F))
   
+  if(metric_name!="ner"){
+    
+    color_levels <- lapply(color_levels, function(x){return(max(min(x,weighted_metrics$metric_upper),
+                                                                weighted_metrics$metric_lower))})
+  }
+  
   color_values <- scales::rescale(x=unlist(color_levels), to=c(0,1))
   
-  breaks <- unlist(color_levels[c("threshold","mean")])
+  breaks <- unlist(color_levels[c(
+    # "Min",
+    "Lower",
+    "Threshold",
+    "Average",
+    "Median",
+    "Upper"
+    # "Max"
+    )])
+  
+  
+  
+  # legend_colors <- c(
+  # #   "#B22C2C",
+  #   "#B22C2C",
+  #                    "#B26F2C",
+  #                    "#B2B22C",
+  #                    "#2CB2B2",
+  #                    "#2C6FB2"
+  #   )
+  legend_colors <- as.character(rev(wes_palette("Zissou1", 6, type = "continuous")))#[2:8]
+  
+  # legend_colors[2:3] <- legend_colors[1:2]
+  # legend_colors[5:6] <- legend_colors[6:7]
+  # 
+  # legend_colors[7] <- "#2C2CB2"
+  # legend_colors[1] <- "#B22C2C"
+  
+  legend_colors <- c("#B22C2C",legend_colors,"#2C2CB2")
+  
+  scale_limits <- c(min(unlist(color_levels)),max(unlist(color_levels)))
+  
+  if(flip_scale==TRUE){
+    # color_levels <- rev(color_levels)
+    # color_values <- rev(color_values)
+    # breaks <- rev(breaks)
+    legend_colors <- rev(legend_colors)
+    # scale_limits <- rev(scale_limits)
+  }
+  
+  if(keep_coordinates){
+    o <- o + theme_classic()
+  } else {
+    o <- o + theme_map()
+  }
   
   p <- o +
     # geom_polygon(data = spdf_fortified, 
     #              aes(fill = nb_equip, x = long, y = lat, group = group) , 
     #              size=0, alpha=0.9) +
     ## theme_void() + 
-    theme_classic() + 
+    # theme_classic() + 
     # ggsn::north(data=map_data, location="bottomright", symbol = 16, scale = .25) + 
     # ggsn::scalebar(data=map_data, location="bottomright") + 
     # scale_colour_identity(
     # scale_fill_identity() +
     scale_color_gradientn(
-      colors = c("#B22C2C",
-                 "#B26F2C",
-                 "#B2B22C",
-                 "#2CB2B2",
-                 "#2C6FB2",
-                 "#2C2CB2"),
-      limits = c(min(unlist(color_levels)),max(unlist(color_levels))),
+      colors = legend_colors,
+      limits = scale_limits,
       values = color_values,
       na.value = "#B3B3B3",
       guide = "none",
       name=FALSE
-    )+
+    ) +
     scale_fill_gradientn(
-      colors = c("#B22C2C",
-                 "#B26F2C",
-                 "#B2B22C",
-                 "#2CB2B2",
-                 "#2C6FB2",
-                 "#2C2CB2"),
-      limits = c(min(unlist(color_levels)),max(unlist(color_levels))),
+      colors = legend_colors,
+      limits = scale_limits,
       values = color_values,
       na.value = "#B3B3B3",
-      breaks=breaks,
-      labels=paste0(names(breaks),": ",to_percent(energy_burden_func(breaks+1,1))),
-      guide = guide_colorbar(direction="horizontal",
+      breaks = breaks,
+      labels = paste0(names(breaks),": ",to_percent(breaks)),
+      guide = guide_colorbar(direction = legend_direction,
                              title.position = 'top',
-                             label.theme = element_text(angle = -45, 
-                                                        hjust=0,
-                                                        vjust=1,
-                                                        size=8)),
-      name=guide_name) +
+                             label.theme = element_text(angle = ifelse(legend_direction == "horizontal",
+                                                                       -45,
+                                                                       0), 
+                                                        # position=position_jitter(width=1,height=1),
+                                                        hjust = 0,
+                                                        vjust = 1#,
+                                                        # size = 8
+                                                        )),
+      name = guide_name) +
     labs(
       title = chart_title,
       subtitle = chart_subtitle
     ) +
     theme(
       legend.position = legend_position,
-      legend.background=element_blank(),
-    ) + 
+      legend.background = element_rect(fill="#9e9e9e75"),
+      # legend.background,
+      legend.margin = margin(t = 3, r = 3, b = 10, l = 3, unit = "pt"),
+      # legend.spacing,
+      # legend.spacing.x,
+      # legend.spacing.y,
+      # legend.key,
+      # legend.key.size = unit(1, "npc"),
+      text  = element_text(size = 20),
+      legend.key.height = unit((dev.size("in")[2] / 5), "inches"),
+      legend.key.width = unit((dev.size("in")[1] / 40), "inches"),
+      # legend.text  = element_text(size = 13),
+      # legend.text = element_text(size = 5, color = "red"),
+      legend.text.align = 0.0,
+      # legend.title = element_text(size = 13),
+      legend.title.align = 0.0,
+      # legend.position,
+      # legend.direction,
+      legend.justification="center"
+      # legend.box,
+      # legend.box.just,
+      # legend.box.margin,
+      # legend.box.background,
+      # legend.box.spacing
+    ) +
     labs(
-      x=NULL,
-      y=NULL
+      x = NULL,
+      y = NULL
     )
     # coord_sf(expand = FALSE) +
     # metR::scale_x_longitude(
@@ -637,7 +738,7 @@ choropleth_map <- function(
                       # labels = c("20", "19.5", "19", "18.5", "18", "17.5"))
   #coord_map()
   if(include_compass){
-    p <- p + ggsn::north(data=map_data, location="bottomright", symbol = 16, scale = .25)
+    p <- p + ggsn::north(data=map_data, location=compass_location, symbol = 16, scale = .25)
   }
   return(p)
 }
@@ -700,20 +801,44 @@ make_all_charts <- function(clean_data,
                             metric_cutoff_label=NULL,
                             upper_quantile_view=1.0,
                             lower_quantile_view=0.0,
+                            weighted_metrics_data=NULL,
                             chart_title=NULL,
                             chart_subtitle=NULL,
                             chart_caption=NULL,
-                            x_label="Proportion of Households"){
+                            x_label="Proportion of Households",
+                            metric_long_name = NULL,#bquote(E[b]),
+                            include_borders=TRUE,
+                            border_field="tract_fips",
+                            legend_position="right", #c(0.15, 0.125),
+                            legend_direction="vertical",
+                            flip_scale=TRUE,
+                            include_basemap=FALSE,
+                            keep_coordinates=FALSE,
+                            infer_missing=FALSE
+                            ){
   
   
-  graph_data <- filter_graph_data(clean_data, group_columns, metric_name)
+  pie_chart <- pie_chart(clean_data=st_drop_geometry(clean_data))
   
-  weighted_metrics <- calculate_weighted_metrics(graph_data, 
-                                                 group_columns, 
-                                                 metric_name, 
-                                                 metric_cutoff_level, 
-                                                 upper_quantile_view, 
-                                                 lower_quantile_view)
+  tree_chart <- tree_chart(clean_data=st_drop_geometry(clean_data))
+  
+  graph_data <- filter_graph_data(st_drop_geometry(clean_data), group_columns, metric_name)
+  
+  if(is.null(weighted_metrics_data)){
+    weighted_metrics <- calculate_weighted_metrics(st_drop_geometry(clean_data), 
+                                                   group_columns, 
+                                                   metric_name, 
+                                                   metric_cutoff_level, 
+                                                   upper_quantile_view, 
+                                                   lower_quantile_view)
+  } else {
+    weighted_metrics <- calculate_weighted_metrics(st_drop_geometry(weighted_metrics_data), 
+                                                   group_columns, 
+                                                   metric_name, 
+                                                   metric_cutoff_level, 
+                                                   upper_quantile_view, 
+                                                   lower_quantile_view)
+  }
   
   
     
@@ -745,13 +870,53 @@ make_all_charts <- function(clean_data,
                                       group_name=NULL,
                                       chart_title,
                                       chart_subtitle)
+    
+    choropleth_chart <- choropleth_map(
+      clean_data,
+      group_columns=unique(c(group_columns,"GEOID")),
+      metric_name,
+      metric_label,
+      metric_cutoff_level,
+      metric_cutoff_label,
+      upper_quantile_view,
+      lower_quantile_view,
+      chart_title,
+      chart_subtitle,
+      weighted_metrics,
+      include_basemap=include_basemap,
+      legend_position=legend_position,#c(0.15, 0.125),
+      legend_direction=legend_direction,#"horizontal",
+      include_compass=FALSE,
+      compass_location="bottomright",
+      metric_long_name=metric_long_name,
+      include_borders=include_borders,
+      border_field=border_field,
+      flip_scale=flip_scale,
+      keep_coordinates=keep_coordinates,
+      infer_missing=infer_missing
+    )
+    
+    dashboard <- patchwork::wrap_plots(
+      choropleth_chart,
+      violin_chart,
+      density_chart,
+      tree_chart,
+      nrow=2,
+      heights = c(2,1), 
+      ncol=2,
+      widths = c(3,1)
+    )
 
   # }
   
   return(list("metrics"=weighted_metrics,
               "density"=density_chart,
-              # "choropleth"=choropleth_chart,
-              "violin"=violin_chart))
+              "choropleth"=choropleth_chart,
+              "violin"=violin_chart,
+              "pie"=pie_chart,
+              "dashboard"=dashboard,
+              "tree"=tree_chart
+              ))
 }
 
 
@@ -851,3 +1016,40 @@ scatter_chart <- function(graph_data,
     plot_layout(ncol = 2, nrow = 2, widths = c(4, 1), heights = c(1, 4))
 }
 
+pie_chart <- function(
+    clean_data
+){
+  final_pie_chart <- clean_data %>% 
+    pivot_longer(cols=c("electricity_spend","gas_spend","other_spend")) %>% 
+    group_by(name) %>%
+    summarise(value=sum(value*households, na.rm=TRUE), .groups = "keep") %>%
+    ggplot(aes(x="", 
+               y=value, 
+               # weight=households, 
+               fill=name)) + geom_bar(stat="identity", width=1) +
+    coord_polar("y",start=0)
+  return(final_pie_chart)
+}
+
+tree_chart <- function(
+    clean_data
+){
+  final_spending_tree_chart <- clean_data %>% 
+    pivot_longer(cols=c("electricity_spend","gas_spend","other_spend")) %>% 
+    group_by(name) %>%
+    summarise(value=sum(value*households)) %>% 
+    mutate(
+      pct=to_percent(value/sum(value))
+    ) %>% 
+    ggplot(aes(area = value, 
+               fill = name,
+               label = paste(name, pct, sep = "\n\n"),
+    )) +
+    geom_treemap() + 
+    geom_treemap_text(colour = "white",
+                      place = "centre",
+                      size = 15) +
+    theme(legend.position = "none")
+    
+    return(final_spending_tree_chart)
+}

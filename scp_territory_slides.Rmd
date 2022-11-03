@@ -6,6 +6,8 @@ institute:
   - "These Slides Were Created On:"
 date: "`r format(Sys.time(), '%Y-%B-%d')`"
 output: 
+  powerpoint_presentation:
+    reference_doc: scp.potx
   beamer_presentation:
     slide_level: 1
     toc: false #true
@@ -35,6 +37,7 @@ states <- "all" #c("ca","nc","sc") #
 refresh <- FALSE
 acs_version <- 2018
 energy_burden_poverty_line <- 0.06
+metric_name <- "energy_burden"
 # geographic_scope <- "tract" #statecitycounty
 
 source("sources.R")
@@ -160,8 +163,12 @@ choropleth_chart <- choropleth_map(
     include_basemap = FALSE,
     include_compass = TRUE,
     metric_long_name = bquote(E[b]),
-    include_borders=TRUE
-      ) 
+    include_borders=TRUE,
+    border_field="state_fips",
+    legend_position="right", #c(0.15, 0.125),
+    legend_direction="vertical",
+    flip_scale=TRUE
+)
   
 
 # choropleth_chart
@@ -199,10 +206,13 @@ choropleth_chart <- choropleth_map(
     weighted_metrics=clean_top_metrics,
     include_basemap = FALSE,
     include_compass = FALSE,
-    legend_position=c(0.25, 0.125),
+    # legend_position=c(0.25, 0.125),
     metric_long_name = bquote(E[b]),
     include_borders=TRUE,
-    border_field="county_fips"
+    border_field="county_fips",
+    legend_position="right", #c(0.15, 0.125),
+    legend_direction="vertical",
+    flip_scale=TRUE
       ) 
   
 

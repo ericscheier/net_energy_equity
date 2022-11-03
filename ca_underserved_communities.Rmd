@@ -1,0 +1,473 @@
+---
+title: "Identifying Underserved Communities"
+author: "Eric Scheier"
+date: "`r Sys.Date()`"
+output:
+  word_document:
+    toc: yes
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo=FALSE,
+  message=FALSE,
+  warning=FALSE,
+  include=FALSE,
+  eval=FALSE
+  )
+
+library(tidyverse)
+library(knitr)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+
+source("sources.R")
+```
+
+```{r}
+# metric_name <- "neb"
+# metric_cutoff_level <- ner_func(g = 1,s = 0.06)^-1
+# metric_label <- bquote(E[b]^n)
+
+metric_name <- "energy_burden"
+metric_cutoff_level <- 0.06
+metric_label <- bquote(E[b])
+
+# as.expression(bquote(~italic(nE[b])~": Energy Burden"))
+```
+
+
+```{r load-data}
+clean_data_ami_all <- read_csv("CohortData_AreaMedianIncome.csv")
+clean_data_fpl_all <- read_csv("CohortData_FederalPovertyLine.csv")
+replica_sup <- read_csv("CensusTractData.csv") #get_replica_supplemental_dataset()
+
+census_tracts_shp <- get_tract_shapefiles(
+    states="all",
+    acs_version=acs_version,
+    refresh=refresh,
+    return_files=TRUE,
+    all_from_list=unique(replica_sup$state_abbr)
+  )
+```
+
+```{r preprocessing}
+clean_data_ami_all$neb <- clean_data_ami_all$ner^-1
+clean_data_fpl_all$neb <- clean_data_fpl_all$ner^-1
+
+clean_data_ami_all_sup <- left_join(clean_data_ami_all, replica_sup, by=c("geoid"))
+clean_data_fpl_all_sup <- left_join(clean_data_fpl_all, replica_sup, by=c("geo_id"="geoid"))
+
+clean_data_ami_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_ami_all_sup, by=c("gisjoin")))
+clean_data_fpl_all_sup_shp <- st_sf(left_join(census_tracts_shp, clean_data_fpl_all_sup, by=c("gisjoin")))
+```
+
+```{r}
+tract_shp <- st_sf(left_join(census_tracts_shp, replica_sup, by=c("gisjoin")))
+
+continental_shp <- tract_shp %>% filter(!(state_abbr %in% c("HI","AK", NA)))
+
+state_shp <- tract_shp %>% filter(state_abbr=="CA")
+
+county_shp <- state_shp %>% filter(county_name %in% c("Sonoma County", "Mendocino County"))
+
+grid_operator_shp <- tract_shp %>% filter(company_na=="Pacific Gas & Electric Co")
+
+territory_shp <- tract_shp %>% filter(state_abbr=="CA", 
+                                         county_name %in% 
+                                           c("Sonoma County",
+                                             "Mendocino County"),
+                                         company_na %in% c("Pacific Gas & Electric Co",
+                                                           "Trinity Public Utilities District")
+                                         )
+
+group_variable <- "geoid"# "GEOID" #"state_abbr" #merge_geo_id" #
+group_columns <- c(group_variable) #c("gisjoin") #
+
+
+# add utility cutout
+# utility_shp <- tract_shp %>% filter(company_na=="")
+
+# full_map_data <- left_join(tract_shp, gwm, by=c("geoid"))
+
+gwm <- calculate_weighted_metrics(filter_graph_data(clean_data_ami_all,
+                                                    c("geoid"),
+                                                    metric_name),
+                           c("geoid"),
+                           metric_name,
+                           metric_cutoff_level=0,
+                           upper_quantile_view = 1,
+                           lower_quantile_view=0)
+
+gwm$metric_name <- metric_name
+
+territory_map_data <- left_join(territory_shp, gwm, by=c("geoid"))
+state_map_data <- left_join(state_shp, gwm, by=c("geoid"))
+county_map_data <- left_join(county_shp, gwm, by=c("geoid"))
+continental_map_data <- left_join(continental_shp, gwm, by=c("geoid"))
+grid_operator_map_data <- left_join(grid_operator_shp, gwm, by=c("geoid"))
+
+
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+```{r}
+d_base <- make_all_charts(
+  clean_data=clean_data_ami_all_sup, 
+  group_columns=c(NULL),
+  metric_name=metric_name, 
+  metric_cutoff_level = metric_cutoff_level,
+  metric_cutoff_label= NULL
+)
+
+# d_base
+```
+
+```{r}
+clean_data_ami_all_sup_shp_dei <- clean_data_ami_all_sup_shp
+```
+
+# Energy Burden
+
+## Income-based Metrics
+
+### Household (Net) Energy Burden
+
+### Household (Net) Energy Return
+
+### Additional burdens to include
+
+#### Housing Burden
+
+https://www.hcd.ca.gov/state-and-federal-income
+
+#### Transporation Burden
+
+#### Food Burden
+
+#### Water Burden
+
+#### Burden of Other Goods and Services
+
+## Other metrics / considerations
+
+### Energy Usage Intensity (using parcel data)
+
+### Energy Equity Gap
+
+https://www.nature.com/articles/s41467-022-30146-5
+
+# Justice 40 Communities
+
+https://screeningtool.geoplatform.gov/en/methodology#3/33.47/-97.5
+
+# AB 841 Priority Communities
+
+AB 841 priority communities are defined as meeting one of the following criteria:
+
+## Disadvantaged Community (PRC Section 75005(g))
+
+(1) Is a “disadvantaged community” as defined by subdivision (g) of Section 75005 of the Public Resources Code.
+
+(g) “Disadvantaged community” means a community with a median household income less than 80% of the statewide average. “Severely disadvantaged community” means a community with a median household income less than 60% of the statewide average.
+
+```{r}
+clean_data_ami_all_sup_shp_dei <- clean_data_ami_all_sup_shp_dei %>% 
+  group_by(
+    STATEFP
+  ) %>% 
+  mutate(
+    state_average_income = mean(sum(income * households, na.rm = T)/sum(households, na.rm = T))
+  ) %>% 
+  ungroup() %>%
+  group_by(
+    geoid
+  ) %>% 
+  mutate(
+    tract_average_income = mean(sum(income * households, na.rm = T)/sum(households, na.rm = T))
+  ) %>%
+  mutate(
+    tract_is_disadvantaged = tract_average_income < 0.80*state_average_income,
+    tract_is_severely_disadvantaged = tract_average_income < 0.60*state_average_income
+  ) %>%
+  ungroup() %>% 
+  mutate(
+    community_is_disadvantaged = income < 0.80*state_average_income,
+    community_is_severely_disadvantaged = income < 0.60*state_average_income
+  )
+    
+clean_data_ami_all_sup_shp_dei
+```
+
+```{r eval=FALSE}
+# lens_summary <- calculate_weighted_metrics(filter_graph_data(clean_data_ami_all_sup_shp_dei,
+#                                                     c("geoid"),
+#                                                     "community_is_disadvantaged"),
+#                            c("geoid"),
+#                            "community_is_disadvantaged",
+#                            metric_cutoff_level=0,
+#                            upper_quantile_view = 1,
+#                            lower_quantile_view=0)
+# 
+# lens_summary$metric_name <- "community_is_disadvantaged"
+
+lens_summary <- clean_data_ami_all_sup_shp_dei %>% 
+  group_by("geoid") %>% 
+  
+
+territory_map_data <- left_join(territory_shp, gwm, by=c("geoid"))
+
+clean_data_ami_all_sup_shp_dei %>% 
+
+left_join(territory_shp, lens_summary)
+
+library(viridis)
+p <- ggplot() +
+  geom_polygon(data = spdf_fortified, 
+               aes(fill = nb_equip, x = long, y = lat, group = group) , size=0, alpha=0.9) +
+  theme_void() +
+  # scale_fill_viridis(trans = "log", 
+  #                    breaks=c(1,5,10,20,50,100), 
+  #                    name="Number of restaurant", 
+  #                    guide = guide_legend( keyheight = unit(3, units = "mm"), 
+  #                                          keywidth=unit(12, units = "mm"), label.position = "bottom", 
+  #                                          title.position = 'top', nrow=1) ) +
+  # labs(
+  #   title = "South of France Restaurant concentration",
+  #   subtitle = "Number of restaurant per city district",
+  #   caption = "Data: INSEE | Creation: Yan Holtz | r-graph-gallery.com"
+  # ) +
+  # theme(
+  #   text = element_text(color = "#22211d"),
+  #   plot.background = element_rect(fill = "#f5f5f2", color = NA),
+  #   panel.background = element_rect(fill = "#f5f5f2", color = NA),
+  #   legend.background = element_rect(fill = "#f5f5f2", color = NA),
+  # 
+  #   plot.title = element_text(size= 22, 
+  #                             hjust=0.01, color = "#4e4d47", margin = margin(b = -0.1, t = 0.4, l = 2, unit = "cm")),
+  #   plot.subtitle = element_text(size= 17, 
+  #                                hjust=0.01, color = "#4e4d47", margin = margin(b = -0.1, t = 0.43, l = 2, unit = "cm")),
+  #   plot.caption = element_text( size=12, color = "#4e4d47", margin = margin(b = 0.3, r=-99, unit = "cm") ),
+  # 
+  #   legend.position = c(0.7, 0.09)
+  # ) +
+  coord_map()
+p
+```
+
+
+## Low-income Community (Health and Safety Code Section 39713(2)(d))
+
+(2) Is included within the definition of “low-income communities” as defined by paragraph (2) of subdivision (d) of Section 39713 of Health and Safety Code:
+
+(2) “Low-income communities” are census tracts with median household incomes at or below 80 percent of the statewide median income or with median household incomes at or below the threshold designated as low income by the Department of Housing and Community Development's list of state income limits adopted pursuant to Section 50093.
+
+https://www.hcd.ca.gov/state-and-federal-income
+
+```{r}
+clean_data_ami_all_sup_shp_dei
+```
+
+
+## Most Disadvantaged 25% on CalEnviroScreen
+
+(3) Is within an area identified as among the most disadvantaged 25 percent in the state according to the California Environmental Protection Agency and based on the most recent California Communities Environmental Health Screening Tool, also known as CalEnviroScreen.
+
+```{r}
+"calenviroscreen40gdb_F_2021.gdb"
+```
+
+
+## 75% National School Lunch Program Participation
+
+(4) Is a community in which at least 75 percent of public school students in the project area are eligible to receive free or reduced-price meals under the National School Lunch Program.
+
+https://www.cde.ca.gov/ds/ad/filessp.asp
+https://nces.ed.gov/programs/edge/Geographic/RelationshipFiles
+
+```{r}
+"frpm2122.xlsx" #"FRPM School-Level Data"
+"GRF21/grf21_lea_tract.xlsx"
+"Percent (%) Eligible FRPM (K-12)"
+```
+
+
+## California Indian Tribe (Federally Recognized)
+
+(5) Is a community located on lands belonging to a federally recognized California Indian tribe.
+
+https://biamaps.doi.gov/bogs/datadownload.html
+
+```{r}
+"BIA_National_LAR_shp"
+```
+
+
+# Opportunity Zones
+
+https://hudgis-hud.opendata.arcgis.com/datasets/ef143299845841f8abb95969c01f88b5_0/about
+
+```{r}
+"Opportunity_Zones.geojson"
+```
+
+# CalEnviroScreen
+
+## Overall
+
+## Components
+### Exposure Indicators 
+#### Ozone
+#### Air Quality: Ozone
+#### Air Quality: PM2.5
+#### Children’s Lead Risk from Housing
+#### Diesel Particulate Matter
+#### Drinking Water Contaminants
+#### Pesticide Use
+#### Toxic Releases from Facilities
+#### Traffic Impacts
+
+### Environmental Effect Indicators
+#### Cleanup Sites
+#### Groundwater Threats
+#### Hazardous Waste Generators and Facilities
+#### Impaired Water Bodies
+#### Solid Waste Sites and Facilities
+
+### Sensitive Population Indicators
+#### Asthma
+#### Cardiovascular Disease
+#### Low Birth Weight Infants
+
+### Socioeconomic Factor Indicators
+#### Educational Attainment
+#### Housing Burden
+#### Linguistic Isolation
+#### Poverty
+#### Unemployment
+
+# CPUC ESJ Communities
+
+https://www.cpuc.ca.gov/news-and-updates/newsroom/environmental-and-social-justice-action-plan
+
+“Environmental and Social Justice Communities” or “ESJ Communities” are identified as those where residents are:
+
+## Predominantly communities of color or low-income;
+
+## Underrepresented in the policy setting or decision-making process;
+
+## Subject to a disproportionate impact from one or more environmental hazards; and
+
+## Likely to experience disparate implementation of environmental regulations and socio-economic investments in their communities.
+
+These communities also include, but are not limited to:
+
+## Disadvantaged Communities;
+
+Defined as census tracts that score in the top 25% of CalEnviroScreen 3.0, along with those that score within the highest 5% of CalEnviroScreen 3.0's Pollution Burden but do not receive an overall CalEnviroScreen score
+
+## All Tribal lands;
+
+## Low-income households; and
+
+Defined as household incomes below 80 percent of the area median income
+
+## Low-income census tracts
+
+Defined as census tracts where aggregated household incomes are less than 80 percent of area or state median income
+
+# UN Sustainable Development Goal Indicators
+
+https://hdr.undp.org/system/files/documents//technical-notes-calculating-human-development-indices.pdf
+
+## Human Development Index (HDI)
+
+https://www.ssrc.org/programs/measure-of-america/mapping-america/
+
+## Inequality-adjusted Human Development Index (IHDI)
+
+## Gender Development Index (GDI)
+
+## Gender Inequality Index (GII)
+
+## Multidimensional Poverty Index (MPI)
+
+# Natural Disasters
+
+## FEMA Risk Index
+
+https://hazards.fema.gov/nri/data-resources#shpDownload
+
+### Avalanche
+### Coastal Flooding
+### Cold Wave
+### Drought
+### Earthquake
+### Hail
+### Heat Wave
+### Hurricane
+### Ice Storm
+### Landslide
+### Lightning
+### Riverine Flooding
+### Strong Wind
+### Tornado
+### Tsunami
+### Volcanic Activity
+### Wildfire
+
+#### PSPS
+
+See psps.rmd (a seperate file which I need to import)
+
+### Winter Weather
+
+## Weather-caused Power Outage
+
+? PG&E data
+? Inference from AMI data
+
+```{r}
+"NRI_Shapefile_CensusTracts" #shp
+"NRI_Shapefile_Tribal_CensusTracts" #shp
+```
+
+## Social Vulnerability
+
+### FEMA Social Vulnerability Index
+https://hazards.fema.gov/nri/social-vulnerability
+
+### CPUC Socioeconomic Vulnerability Index
+https://www.cpuc.ca.gov/industries-and-topics/electrical-energy/affordability/socioeconomic-vulnerability-index
+
+## Community Resilience
+
+https://hazards.fema.gov/nri/community-resilience
+
+# Health
+
+## California Healthly Place Index
+
+https://map.healthyplacesindex.org/?redirect=false
+
+## Community Deprivation Index
+
+https://github.com/geomarker-io/dep_index
+
+# Additional Ideas
+
+## Is there a way to utilize knowledge about local businesses for this?
+
+## What technology and programs a household has access to
+
+## California Indian Tribe (State Recognized)
+
+## CalEnviroScreen Sensitivity
+
+## Number of members of households
+
+## Demographics
+
+## Other Census Data
+
